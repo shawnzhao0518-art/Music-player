@@ -80,6 +80,16 @@
         </main>
     </div>
 
+    <div id="full-queue-modal" class="queue-modal hidden">
+        <div class="queue-modal-header">
+            <h3>待播清单</h3>
+            <button class="btn-done" onclick="toggleQueue()">完成</button>
+        </div>
+        <div class="queue-modal-content" id="queue-content-list">
+            </div>
+        <div style="height: 20px;"></div>
+    </div>
+
     <footer class="player-bar">
         <div class="player-info">
             <div class="cover-art" id="current-cover">
@@ -109,7 +119,7 @@
                     <i class="fa-solid fa-forward-step"></i>
                 </button>
 
-                <button class="ctrl-btn icon-only disabled">
+                <button class="ctrl-btn icon-only" id="queue-btn" onclick="toggleQueue()" title="待播放清单">
                     <i class="fa-solid fa-list-ul"></i>
                 </button>
             </div>
