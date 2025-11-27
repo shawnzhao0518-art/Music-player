@@ -1,0 +1,443 @@
+:root {
+    --bg-color: #ffffff;
+    --sidebar-bg: #f9f9f9;
+    --text-primary: #1d1d1f;
+    --text-secondary: #86868b;
+    --accent-color: #fa2d48; /* Apple Music Red */
+    --accent-hover: #d6233c;
+    --border-color: #e5e5e5;
+    --highlight-bg: #f5f5f7;
+    --player-height: 90px;
+    --sidebar-width: 260px;
+    --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none; /* 防止文本被随意选中，提升App感 */
+}
+
+body {
+    font-family: var(--font-family);
+    color: var(--text-primary);
+    background-color: var(--bg-color);
+    overflow: hidden; /* 隐藏整个页面的滚动条，只让部分区域滚动 */
+    height: 100vh;
+    font-size: 14px;
+}
+
+/* 布局容器 */
+.app-container {
+    display: flex;
+    height: calc(100vh - var(--player-height));
+    width: 100%;
+}
+
+/* === Sidebar === */
+.sidebar {
+    width: var(--sidebar-width);
+    background-color: var(--sidebar-bg);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    padding: 20px 0;
+    flex-shrink: 0;
+}
+
+.sidebar-header {
+    padding: 0 20px 20px;
+    font-size: 20px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--accent-color);
+}
+
+.menu-group {
+    margin-bottom: 24px;
+}
+
+.menu-label, .menu-label-row {
+    padding: 0 20px 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.menu-item {
+    padding: 10px 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--text-primary);
+    transition: background 0.2s;
+    font-size: 14px;
+}
+
+.menu-item:hover {
+    background-color: rgba(0,0,0,0.05);
+}
+
+.menu-item.active {
+    background-color: #e8e8ed;
+    color: var(--accent-color);
+    font-weight: 500;
+}
+
+.menu-item i {
+    width: 20px;
+    text-align: center;
+}
+
+/* 删除按钮样式 */
+.delete-playlist-btn {
+    margin-left: auto;
+    opacity: 0;
+    color: var(--text-secondary);
+    transition: opacity 0.2s;
+}
+.menu-item:hover .delete-playlist-btn {
+    opacity: 1;
+}
+.delete-playlist-btn:hover {
+    color: var(--accent-color);
+}
+
+/* === Main Content === */
+.main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-color);
+    overflow: hidden;
+}
+
+.top-bar {
+    height: 60px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 30px;
+    flex-shrink: 0;
+}
+
+.search-box {
+    background: #f0f0f0;
+    border-radius: 8px;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    width: 300px;
+    gap: 8px;
+    color: var(--text-secondary);
+}
+
+.search-box input {
+    border: none;
+    background: transparent;
+    outline: none;
+    width: 100%;
+    font-size: 14px;
+}
+
+.btn-primary {
+    background-color: var(--accent-color);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.2s;
+}
+
+.btn-primary:hover {
+    background-color: var(--accent-hover);
+}
+
+.icon-btn-small {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+.icon-btn-small:hover { color: var(--accent-color); }
+
+/* === Song View === */
+.content-view {
+    flex: 1;
+    overflow-y: auto; /* 内容区独立滚动 */
+    padding: 20px 30px;
+}
+
+.view-header {
+    margin-bottom: 20px;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+}
+
+.view-header h1 {
+    font-size: 32px;
+    font-weight: 700;
+}
+
+.view-header span {
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+/* Table Style */
+.song-table-header {
+    display: grid;
+    grid-template-columns: 50px 4fr 3fr 3fr 80px 50px; /* 调整列宽 */
+    padding: 10px 10px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.sortable { cursor: pointer; }
+.sortable:hover { color: var(--text-primary); }
+
+.song-item {
+    display: grid;
+    grid-template-columns: 50px 4fr 3fr 3fr 80px 50px;
+    padding: 12px 10px;
+    border-bottom: 1px solid #f5f5f5;
+    align-items: center;
+    border-radius: 6px;
+    transition: background 0.1s;
+}
+
+.song-item:hover {
+    background-color: #f2f2f2;
+}
+
+.song-item.active {
+    color: var(--accent-color);
+    background-color: #fff2f4;
+}
+
+.song-item.active .col-index {
+    visibility: hidden; /* 隐藏序号 */
+    position: relative;
+}
+/* 活跃状态显示播放小图标 */
+.song-item.active .col-index::after {
+    content: '\f04b'; /* FontAwesome Play Icon code (simplified) */
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    visibility: visible;
+    position: absolute;
+    left: 10px;
+}
+
+.col-index { color: var(--text-secondary); text-align: center; }
+.col-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.col-artist, .col-album { color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.col-time { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.col-actions button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-secondary);
+    padding: 4px;
+}
+.col-actions button:hover { color: var(--text-primary); }
+
+/* 拖拽样式 */
+.song-item.dragging {
+    opacity: 0.5;
+    background: #e0e0e0;
+}
+
+.empty-state {
+    text-align: center;
+    margin-top: 100px;
+    color: var(--text-secondary);
+}
+.empty-state i { font-size: 48px; margin-bottom: 16px; opacity: 0.3; }
+
+/* === Player Bar === */
+.player-bar {
+    height: var(--player-height);
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border-color);
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    padding: 0 30px;
+    justify-content: space-between;
+    z-index: 100;
+}
+
+.player-info {
+    display: flex;
+    align-items: center;
+    width: 25%;
+    gap: 12px;
+}
+
+.cover-art {
+    width: 48px;
+    height: 48px;
+    background: #e0e0e0;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #999;
+    overflow: hidden;
+    background-size: cover;
+    background-position: center;
+}
+.cover-art img { width: 100%; height: 100%; object-fit: cover; }
+
+.track-details { display: flex; flex-direction: column; overflow: hidden; }
+.track-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.track-artist { font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.player-controls-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    max-width: 500px;
+}
+
+.control-buttons {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    margin-bottom: 6px;
+}
+
+.ctrl-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+}
+.ctrl-btn:hover { color: var(--accent-color); }
+.ctrl-btn.icon-only { font-size: 16px; color: var(--text-secondary); }
+.ctrl-btn.icon-only.active { color: var(--accent-color); }
+.ctrl-btn.play-pause-btn { font-size: 32px; }
+.ctrl-btn.disabled { opacity: 0.3; cursor: default; }
+
+.progress-section {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Range Input Styling (Webkit) */
+input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    background: transparent;
+    cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    height: 12px;
+    width: 12px;
+    border-radius: 50%;
+    background: var(--text-secondary);
+    margin-top: -4px;
+    box-shadow: 0 0 2px rgba(0,0,0,0.3);
+}
+input[type=range]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 4px;
+    background: #ddd;
+    border-radius: 2px;
+}
+input[type=range]:focus::-webkit-slider-runnable-track { background: #ccc; }
+
+.player-volume {
+    width: 25%;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+}
+.player-volume input { width: 100px; }
+
+/* Modal */
+.modal {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+.hidden { display: none; }
+.modal-content {
+    background: white;
+    padding: 24px;
+    border-radius: 12px;
+    width: 300px;
+    text-align: center;
+}
+#modal-playlist-list {
+    list-style: none;
+    margin: 16px 0;
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #eee;
+}
+#modal-playlist-list li {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+}
+#modal-playlist-list li:hover { background: #f5f5f5; }
+.btn-secondary {
+    background: #e5e5e5;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .sidebar { display: none; /* 移动端暂时隐藏侧边栏，或设计为汉堡菜单 */ }
+    .main-content { width: 100%; }
+    .col-album, .col-time { display: none; }
+    .song-table-header, .song-item { grid-template-columns: 40px 1fr 1fr 40px; }
+    .player-volume { display: none; } /* 移动端隐藏音量条，使用系统音量 */
+    .player-info { width: 30%; }
+    .player-controls-container { width: 70%; max-width: none; }
+}
