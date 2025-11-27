@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Web Music Player - Simplified Apple Music</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
@@ -48,7 +48,8 @@
                     <input type="text" id="search-input" placeholder="搜索歌曲、艺人..." oninput="handleSearch(this.value)">
                 </div>
                 <div class="actions">
-                    <input type="file" id="file-upload" multiple accept="audio/*" style="display: none;" onchange="handleFiles(this.files)">
+                    <input type="file" id="file-upload" multiple accept=".mp3, .m4a, .wav, .flac, .ogg, audio/*" style="display: none;" onchange="handleFiles(this.files)">
+                    
                     <button class="btn-primary" onclick="document.getElementById('file-upload').click()">
                         <i class="fa-solid fa-upload"></i> 导入音乐
                     </button>
@@ -93,7 +94,8 @@
         <div class="player-controls-container">
             <div class="control-buttons">
                 <button class="ctrl-btn icon-only" id="mode-btn" onclick="toggleMode()" title="顺序播放">
-                    <i class="fa-solid fa-repeat"></i> </button>
+                    <i class="fa-solid fa-repeat"></i>
+                </button>
                 
                 <button class="ctrl-btn" onclick="playPrev()">
                     <i class="fa-solid fa-backward-step"></i>
