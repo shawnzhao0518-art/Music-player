@@ -1,26 +1,95 @@
-/* * app.js - Web Music Player Core Logic
- * 功能：状态管理、音频播放、播放列表操作、拖拽排序、UI渲染
+/* * app.js - Web Music Player Core Logic (With IndexedDB Persistence)
+ * 功能：状态管理、音频播放、播放列表操作、拖拽排序、UI渲染、本地数据库存储
  */
+
+// ==========================================
+// 0. IndexedDB 数据库管理 (持久化存储核心)
+// ==========================================
+const dbName = "WebMusicPlayerDB";
+const storeName = "songs";
+let db;
+
+const MusicDB = {
+    init: () => {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(dbName, 1);
+            
+            request.onupgradeneeded = (event) => {
+                db = event.target.result;
+                if (!db.objectStoreNames.contains(storeName)) {
+                    db.createObjectStore(storeName, { keyPath: "id" });
+                }
+            };
+
+            request.onsuccess = (event) => {
+                db = event.target.result;
+                console.log("Database initialized");
+                resolve(db);
+            };
+
+            request.onerror = (event) => {
+                console.error("Database error", event);
+                reject("DB Error");
+            };
+        });
+    },
+
+    addSong: (song) => {
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([storeName], "readwrite");
+            const store = transaction.objectStore(storeName);
+            const request = store.add(song); // 存储整个对象（包含文件Blob）
+            
+            request.onsuccess = () => resolve(song);
+            request.onerror = (e) => reject(e);
+        });
+    },
+
+    getAllSongs: () => {
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([storeName], "readonly");
+            const store = transaction.objectStore(storeName);
+            const request = store.getAll();
+
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = (e) => reject(e);
+        });
+    },
+
+    deleteSong: (id) => {
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([storeName], "readwrite");
+            const store = transaction.objectStore(storeName);
+            const request = store.delete(id);
+            request.onsuccess = () => resolve();
+        });
+    },
+    
+    clearAll: () => {
+        const transaction = db.transaction([storeName], "readwrite");
+        transaction.objectStore(storeName).clear();
+    }
+};
 
 // ==========================================
 // 1. 全局状态 (State Management)
 // ==========================================
 const state = {
-    allSongs: [],           // 存储所有导入的歌曲对象: { id, file, title, artist, album, duration, cover }
+    allSongs: [],           // 存储所有歌曲对象
     playlists: [            // 播放列表数组
         { id: 'fav', name: '我的最爱', songIds: [] }
     ],
-    history: [],            // 历史播放记录 (Song IDs)
+    history: [],            
     
-    currentView: 'all-songs', // 当前视图: 'all-songs', 'recent', 或 playlist ID
-    currentPlaylist: [],      // 当前正在播放的队列 (Song Objects)
-    currentSongIndex: -1,     // 当前播放歌曲在队列中的索引
+    currentView: 'all-songs', 
+    currentPlaylist: [],      
+    currentSongIndex: -1,     
     
     isPlaying: false,
-    mode: 'sequence',         // 播放模式: 'sequence' (顺序), 'shuffle' (随机), 'one' (单曲)
+    mode: 'sequence',         
     volume: 1,
     
-    dragStartIndex: null      // 拖拽排序起始索引
+    dragStartIndex: null      
 };
 
 // 核心音频对象
@@ -29,25 +98,39 @@ const audio = new Audio();
 // ==========================================
 // 2. 初始化与事件监听 (Init & Listeners)
 // ==========================================
-document.addEventListener('DOMContentLoaded', () => {
-    // 恢复数据 (可选：从 localStorage 恢复播放列表结构)
+document.addEventListener('DOMContentLoaded', async () => {
+    // 1. 初始化数据库
+    await MusicDB.init();
+
+    // 2. 从数据库加载之前的歌曲
+    const savedSongs = await MusicDB.getAllSongs();
+    if (savedSongs && savedSongs.length > 0) {
+        state.allSongs = savedSongs;
+        console.log(`Loaded ${savedSongs.length} songs from storage.`);
+    }
+
+    // 3. 恢复播放列表结构
     loadPlaylists();
     
-    // 渲染 UI
+    // 4. 渲染 UI
     renderSidebar();
     renderSongList();
+    updateUIState();
     
     // 音频事件绑定
     audio.addEventListener('timeupdate', updateProgress);
     audio.addEventListener('ended', handleSongEnd);
     audio.addEventListener('loadedmetadata', () => {
-        document.getElementById('total-duration').innerText = formatTime(audio.duration);
-        document.getElementById('seek-bar').max = audio.duration;
+        const duration = audio.duration;
+        document.getElementById('total-duration').innerText = formatTime(duration);
+        document.getElementById('seek-bar').max = duration;
+        
+        // 可选：更新当前播放歌曲的时长到数据库（如果之前是0）
+        // updateSongDurationInDB(...)
     });
     audio.addEventListener('error', (e) => {
         console.error("Audio error", e);
-        // 如果出错自动播下一首
-        setTimeout(playNext, 1000); 
+        // 如果出错不自动切歌，避免死循环
     });
 });
 
@@ -57,27 +140,25 @@ document.addEventListener('DOMContentLoaded', () => {
 async function handleFiles(files) {
     if (!files.length) return;
 
-    // 显示加载状态（简单处理）
     const titleElem = document.getElementById('view-title');
     const originalTitle = titleElem.innerText;
-    titleElem.innerText = "正在分析音频...";
+    titleElem.innerText = "正在导入并保存..."; // 提示用户正在存库
 
     for (let file of files) {
-        // 简单 ID 生成
         const songId = 'song_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         
-        // 默认元数据
+        // 基础元数据
         let song = {
             id: songId,
-            file: file, // 注意：File 对象在页面刷新后会失效，这是纯前端限制
-            title: file.name.replace(/\.[^/.]+$/, ""), // 去除后缀作为标题
+            file: file, // 这是一个 Blob/File 对象，IndexedDB 支持直接存储它
+            title: file.name.replace(/\.[^/.]+$/, ""),
             artist: '未知艺人',
             album: '未知专辑',
             duration: 0,
-            cover: null
+            dateAdded: Date.now()
         };
 
-        // 尝试读取 ID3 信息 (如果有 jsmediatags 库)
+        // 读取 ID3 (可选)
         if (window.jsmediatags) {
             try {
                 await new Promise((resolve) => {
@@ -87,87 +168,75 @@ async function handleFiles(files) {
                             if (tags.title) song.title = tags.title;
                             if (tags.artist) song.artist = tags.artist;
                             if (tags.album) song.album = tags.album;
-                            // 封面读取略微复杂，这里暂略，需要转 base64
                             resolve();
                         },
-                        onError: (error) => {
-                            resolve(); // 失败也继续
-                        }
+                        onError: () => resolve()
                     });
                 });
             } catch (e) { console.log('Tag read error', e); }
         }
 
-        // 获取时长（创建临时 Audio 对象）
-        // 为了性能，如果不强制预加载时长，可以在播放时更新。
-        // 这里简单略过，设为 0，播放时会自动显示。
-        
+        // 保存到内存
         state.allSongs.push(song);
+        // 保存到数据库 (持久化)
+        MusicDB.addSong(song).catch(e => console.error("Save failed", e));
     }
 
     titleElem.innerText = originalTitle;
     
-    // 如果当前视图是 "全部歌曲"，刷新列表
     if (state.currentView === 'all-songs') {
         renderSongList();
     }
-    
-    // 更新侧边栏数量等
     updateUIState();
+}
+
+// 辅助：更新侧边栏等状态（如果有）
+function updateUIState() {
+    // 可以在这里更新侧边栏的计数等
 }
 
 // ==========================================
 // 4. 核心播放逻辑 (Playback Logic)
 // ==========================================
 
-// 播放指定歌曲 (根据 ID)
 function playSongById(id) {
     const song = state.allSongs.find(s => s.id === id);
     if (!song) return;
 
-    // 1. 设置当前播放队列逻辑
-    // 如果是在 "全部歌曲" 视图点击，队列就是 state.allSongs
-    // 如果是在 "播放列表" 视图点击，队列就是该播放列表的歌曲
-    // 这里简化：点击哪里，就把当前视图的所有歌曲作为播放队列
     setupQueueBasedOnView();
-
-    // 2. 找到该歌在队列中的 Index
     state.currentSongIndex = state.currentPlaylist.findIndex(s => s.id === id);
-
-    // 3. 执行播放
     loadAndPlay(song);
 }
 
-// 根据当前视图设置播放队列
 function setupQueueBasedOnView() {
     state.currentPlaylist = getCurrentViewSongs();
 }
 
-// 加载音频源并播放
 function loadAndPlay(song) {
     if (!song.file) {
-        alert("文件已失效（页面刷新导致），请重新导入。");
+        alert("文件数据丢失");
         return;
     }
 
-    // 使用 Blob URL 播放本地文件
+    // 释放之前的 URL 以节省内存
+    if (audio.src && audio.src.startsWith('blob:')) {
+        URL.revokeObjectURL(audio.src);
+    }
+
+    // 从 Blob 创建播放 URL
     const fileURL = URL.createObjectURL(song.file);
     audio.src = fileURL;
-    audio.play();
-    state.isPlaying = true;
+    audio.play()
+        .then(() => { state.isPlaying = true; updatePlayButtonIcon(); })
+        .catch(e => { console.error("Play failed", e); state.isPlaying = false; updatePlayButtonIcon(); });
 
-    // 更新 UI
     updatePlayerBar(song);
     addToHistory(song.id);
     highlightActiveSong(song.id);
-    updatePlayButtonIcon();
-
-    // 清理旧的 Blob URL (可选优化，简单版略过)
 }
 
 function togglePlay() {
     if (!audio.src) {
-        // 如果没有正在播放的，且有歌，播放第一首
         if (state.allSongs.length > 0) playSongById(state.allSongs[0].id);
         return;
     }
@@ -187,13 +256,11 @@ function playNext() {
 
     let nextIndex;
     if (state.mode === 'shuffle') {
-        // 随机模式：简单随机取一个非当前的索引
         nextIndex = Math.floor(Math.random() * state.currentPlaylist.length);
     } else {
-        // 顺序模式
         nextIndex = state.currentSongIndex + 1;
         if (nextIndex >= state.currentPlaylist.length) {
-            nextIndex = 0; // 循环回到开头
+            nextIndex = 0; 
         }
     }
 
@@ -204,7 +271,6 @@ function playNext() {
 function playPrev() {
     if (state.currentPlaylist.length === 0) return;
     
-    // 如果播放超过3秒，点击上一首通常是重头开始
     if (audio.currentTime > 3) {
         audio.currentTime = 0;
         return;
@@ -217,7 +283,6 @@ function playPrev() {
     loadAndPlay(state.currentPlaylist[prevIndex]);
 }
 
-// 歌曲结束时的处理
 function handleSongEnd() {
     if (state.mode === 'one') {
         audio.currentTime = 0;
@@ -227,24 +292,21 @@ function handleSongEnd() {
     }
 }
 
-// 切换播放模式
 function toggleMode() {
     const modes = ['sequence', 'shuffle', 'one'];
     const icons = {
-        'sequence': 'fa-repeat', // 实际上 sequence 图标通常是默认状态，这里用 repeat 表示列表循环
+        'sequence': 'fa-repeat',
         'shuffle': 'fa-shuffle',
-        'one': 'fa-1' // 需要 FontAwesome 6
+        'one': 'fa-1' 
     };
     
     let currentIdx = modes.indexOf(state.mode);
     let nextIdx = (currentIdx + 1) % modes.length;
     state.mode = modes[nextIdx];
     
-    // 更新图标和高亮
     const btn = document.getElementById('mode-btn');
     btn.innerHTML = `<i class="fa-solid ${icons[state.mode]}"></i>`;
     
-    // 高亮状态
     if (state.mode !== 'sequence') {
         btn.classList.add('active');
     } else {
@@ -256,7 +318,6 @@ function toggleMode() {
 // 5. UI 渲染与交互 (UI Rendering)
 // ==========================================
 
-// 获取当前视图应该显示的歌曲数组
 function getCurrentViewSongs() {
     let songs = [];
     if (state.currentView === 'all-songs') {
@@ -264,14 +325,12 @@ function getCurrentViewSongs() {
     } else if (state.currentView === 'recent') {
         songs = state.history.map(id => state.allSongs.find(s => s.id === id)).filter(s => s);
     } else {
-        // 具体的播放列表
         const playlist = state.playlists.find(p => p.id === state.currentView);
         if (playlist) {
             songs = playlist.songIds.map(id => state.allSongs.find(s => s.id === id)).filter(s => s);
         }
     }
     
-    // 搜索过滤
     const keyword = document.getElementById('search-input').value.toLowerCase();
     if (keyword) {
         songs = songs.filter(s => s.title.toLowerCase().includes(keyword) || s.artist.toLowerCase().includes(keyword));
@@ -284,7 +343,6 @@ function renderSongList() {
     const listContainer = document.getElementById('song-list');
     const songs = getCurrentViewSongs();
     
-    // 更新标题和数量
     const countSpan = document.getElementById('song-count');
     countSpan.innerText = `${songs.length} 首歌`;
     
@@ -293,16 +351,17 @@ function renderSongList() {
             <div class="empty-state">
                 <i class="fa-solid fa-music"></i>
                 <p>这里没有歌曲</p>
+                <button class="btn-secondary" onclick="deleteAllSongs()" style="margin-top:10px;">清空数据库</button>
             </div>`;
         return;
     }
 
-    listContainer.innerHTML = ''; // 清空
+    listContainer.innerHTML = ''; 
 
     songs.forEach((song, index) => {
         const row = document.createElement('div');
         row.className = 'song-item';
-        // 拖拽属性
+        
         if (state.currentView !== 'all-songs' && state.currentView !== 'recent') {
             row.setAttribute('draggable', 'true');
             row.addEventListener('dragstart', (e) => handleDragStart(e, index));
@@ -311,11 +370,12 @@ function renderSongList() {
             row.addEventListener('dragend', handleDragEnd);
         }
         
-        // 双击播放
         row.ondblclick = () => playSongById(song.id);
-        // 单击高亮 (这里简单做，实际可以做选中态)
         
-        // 检查是否是当前播放
+        // 移动端/iPad 单击也播放（优化体验）
+        // 简单区分：如果屏幕小，或者想支持单击切歌
+        // row.onclick = () => playSongById(song.id); 
+
         if (state.allSongs[state.currentSongIndex] && state.allSongs[state.currentSongIndex].id === song.id) {
             row.classList.add('active');
         }
@@ -329,6 +389,9 @@ function renderSongList() {
             <div class="col-actions">
                 <button onclick="openAddToPlaylistModal('${song.id}')" title="添加到播放列表">
                     <i class="fa-solid fa-plus"></i>
+                </button>
+                <button onclick="removeSong('${song.id}')" title="删除">
+                    <i class="fa-solid fa-trash"></i>
                 </button>
             </div>
         `;
@@ -346,7 +409,6 @@ function renderSidebar() {
         if (state.currentView === pl.id) li.classList.add('active');
         
         li.onclick = (e) => {
-            // 防止触发内部按钮
             if (e.target.closest('.delete-playlist-btn')) return;
             switchView(pl.id);
         };
@@ -362,7 +424,6 @@ function renderSidebar() {
 function switchView(viewId) {
     state.currentView = viewId;
     
-    // 更新 Sidebar 高亮
     document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
     if (viewId === 'all-songs' || viewId === 'recent') {
         document.querySelector(`[data-view="${viewId}"]`).classList.add('active');
@@ -370,7 +431,7 @@ function switchView(viewId) {
     } else {
         const pl = state.playlists.find(p => p.id === viewId);
         if (pl) document.getElementById('view-title').innerText = pl.name;
-        renderSidebar(); // 重新渲染列表以更新高亮
+        renderSidebar(); 
     }
     
     renderSongList();
@@ -379,7 +440,7 @@ function switchView(viewId) {
 function updatePlayerBar(song) {
     document.getElementById('current-name').innerText = song.title;
     document.getElementById('current-artist').innerText = song.artist;
-    // 简单封面占位
+    // 封面暂时略
     document.getElementById('current-cover').innerHTML = `<i class="fa-solid fa-compact-disc" style="font-size:24px"></i>`;
 }
 
@@ -389,7 +450,6 @@ function updatePlayButtonIcon() {
 }
 
 function highlightActiveSong(songId) {
-    // 简单重绘整个列表保持状态同步
     renderSongList();
 }
 
@@ -398,14 +458,17 @@ function handleSearch(val) {
 }
 
 function sortSongs(field) {
-    // 简单的本地排序
-    // 注意：如果是播放列表中排序，应该改变 playlist.songIds 的顺序并保存
-    // 这里为了演示，仅对当前视图的数组排序（不做持久化）
-    alert("演示版：仅支持视图排序，未改变播放顺序");
+    // 简单排序，不影响数据库，只影响 allSongs 内存顺序
+    state.allSongs.sort((a, b) => {
+        if (a[field] > b[field]) return 1;
+        if (a[field] < b[field]) return -1;
+        return 0;
+    });
+    renderSongList();
 }
 
 // ==========================================
-// 6. 播放列表管理 (Playlists)
+// 6. 播放列表与数据管理
 // ==========================================
 
 function createPlaylist() {
@@ -428,6 +491,36 @@ function deletePlaylist(id) {
     if (state.currentView === id) switchView('all-songs');
     savePlaylists();
     renderSidebar();
+}
+
+// 删除单个歌曲
+function removeSong(id) {
+    if (!confirm("确定从库中删除这首歌吗？")) return;
+    
+    // 1. 内存删除
+    state.allSongs = state.allSongs.filter(s => s.id !== id);
+    state.playlists.forEach(pl => {
+        pl.songIds = pl.songIds.filter(sid => sid !== id);
+    });
+    state.history = state.history.filter(sid => sid !== id);
+    
+    // 2. 数据库删除
+    MusicDB.deleteSong(id);
+    
+    savePlaylists();
+    renderSongList();
+}
+
+// 开发者功能：清空所有数据
+function deleteAllSongs() {
+    if(confirm("确定清空所有本地存储的音乐吗？")) {
+        MusicDB.clearAll();
+        state.allSongs = [];
+        state.playlists.forEach(p => p.songIds = []);
+        state.history = [];
+        savePlaylists();
+        renderSongList();
+    }
 }
 
 // 模态框逻辑
@@ -458,8 +551,6 @@ function closeModal() {
 }
 
 function savePlaylists() {
-    // 持久化播放列表结构到 localStorage
-    // 注意：无法持久化 file 对象，所以刷新页面后列表还在，但内容需要重新匹配（这里简化版不处理重新匹配）
     localStorage.setItem('myMusic_playlists', JSON.stringify(state.playlists));
 }
 
@@ -471,7 +562,6 @@ function loadPlaylists() {
 }
 
 function addToHistory(songId) {
-    // 移除已存在的，添加到开头
     state.history = state.history.filter(id => id !== songId);
     state.history.unshift(songId);
     if (state.history.length > 50) state.history.pop();
@@ -487,7 +577,7 @@ function handleDragStart(e, index) {
 }
 
 function handleDragOver(e) {
-    e.preventDefault(); // 必须阻止默认行为才能 Drop
+    e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
 }
 
@@ -497,16 +587,13 @@ function handleDrop(e, dropIndex) {
     
     if (startIndex === null || startIndex === dropIndex) return;
 
-    // 获取当前播放列表对象
     const playlist = state.playlists.find(p => p.id === state.currentView);
-    if (!playlist) return; // 只允许在自定义播放列表中排序
+    if (!playlist) return; 
     
-    // 移动数组元素
     const list = playlist.songIds;
     const [movedItem] = list.splice(startIndex, 1);
     list.splice(dropIndex, 0, movedItem);
     
-    // 保存并重绘
     savePlaylists();
     renderSongList();
 }
@@ -531,9 +618,6 @@ function updateProgress() {
     const duration = audio.duration;
     document.getElementById('seek-bar').value = current;
     document.getElementById('current-time').innerText = formatTime(current);
-    
-    // 进度条背景处理 (类似 Webkit 样式 hack)
-    // 略
 }
 
 function handleSeek(val) {
