@@ -1,9 +1,7 @@
-/* * app.js - Web Music Player Core Logic (With IndexedDB Persistence)
- * 功能：状态管理、音频播放、播放列表操作、拖拽排序、UI渲染、本地数据库存储
- */
+/* * app.js - Web Music Player Core Logic (Complete) */
 
 // ==========================================
-// 0. IndexedDB 数据库管理 (持久化存储核心)
+// 0. IndexedDB 数据库管理 (持久化存储)
 // ==========================================
 const dbName = "WebMusicPlayerDB";
 const storeName = "songs";
@@ -38,8 +36,7 @@ const MusicDB = {
         return new Promise((resolve, reject) => {
             const transaction = db.transaction([storeName], "readwrite");
             const store = transaction.objectStore(storeName);
-            const request = store.add(song); // 存储整个对象（包含文件Blob）
-            
+            const request = store.add(song);
             request.onsuccess = () => resolve(song);
             request.onerror = (e) => reject(e);
         });
@@ -50,7 +47,6 @@ const MusicDB = {
             const transaction = db.transaction([storeName], "readonly");
             const store = transaction.objectStore(storeName);
             const request = store.getAll();
-
             request.onsuccess = () => resolve(request.result);
             request.onerror = (e) => reject(e);
         });
@@ -75,90 +71,71 @@ const MusicDB = {
 // 1. 全局状态 (State Management)
 // ==========================================
 const state = {
-    allSongs: [],           // 存储所有歌曲对象
-    playlists: [            // 播放列表数组
-        { id: 'fav', name: '我的最爱', songIds: [] }
-    ],
-    history: [],            
+    allSongs: [],
+    playlists: [{ id: 'fav', name: '我的最爱', songIds: [] }],
+    history: [],
     
-    currentView: 'all-songs', 
-    currentPlaylist: [],      
-    currentSongIndex: -1,     
+    currentView: 'all-songs',
+    currentPlaylist: [],
+    currentSongIndex: -1,
     
     isPlaying: false,
-    mode: 'sequence',         
+    mode: 'sequence',
     volume: 1,
     
-    dragStartIndex: null      
+    dragStartIndex: null,       // 用于播放列表的拖拽
+    queueDragStartIndex: null   // 用于全屏队列的拖拽
 };
 
-// 核心音频对象
 const audio = new Audio();
 
 // ==========================================
-// 2. 初始化与事件监听 (Init & Listeners)
+// 2. 初始化
 // ==========================================
 document.addEventListener('DOMContentLoaded', async () => {
-    // 1. 初始化数据库
     await MusicDB.init();
-
-    // 2. 从数据库加载之前的歌曲
+    
     const savedSongs = await MusicDB.getAllSongs();
     if (savedSongs && savedSongs.length > 0) {
         state.allSongs = savedSongs;
         console.log(`Loaded ${savedSongs.length} songs from storage.`);
     }
 
-    // 3. 恢复播放列表结构
     loadPlaylists();
-    
-    // 4. 渲染 UI
     renderSidebar();
     renderSongList();
-    updateUIState();
     
-    // 音频事件绑定
+    // Audio Events
     audio.addEventListener('timeupdate', updateProgress);
     audio.addEventListener('ended', handleSongEnd);
     audio.addEventListener('loadedmetadata', () => {
-        const duration = audio.duration;
-        document.getElementById('total-duration').innerText = formatTime(duration);
-        document.getElementById('seek-bar').max = duration;
-        
-        // 可选：更新当前播放歌曲的时长到数据库（如果之前是0）
-        // updateSongDurationInDB(...)
+        document.getElementById('total-duration').innerText = formatTime(audio.duration);
+        document.getElementById('seek-bar').max = audio.duration;
     });
-    audio.addEventListener('error', (e) => {
-        console.error("Audio error", e);
-        // 如果出错不自动切歌，避免死循环
-    });
+    audio.addEventListener('error', (e) => console.error("Audio error", e));
 });
 
 // ==========================================
-// 3. 文件处理与导入 (File Handling)
+// 3. 文件导入
 // ==========================================
 async function handleFiles(files) {
     if (!files.length) return;
 
     const titleElem = document.getElementById('view-title');
     const originalTitle = titleElem.innerText;
-    titleElem.innerText = "正在导入并保存..."; // 提示用户正在存库
+    titleElem.innerText = "正在导入并保存...";
 
     for (let file of files) {
         const songId = 'song_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        
-        // 基础元数据
         let song = {
             id: songId,
-            file: file, // 这是一个 Blob/File 对象，IndexedDB 支持直接存储它
+            file: file,
             title: file.name.replace(/\.[^/.]+$/, ""),
             artist: '未知艺人',
             album: '未知专辑',
-            duration: 0,
-            dateAdded: Date.now()
+            duration: 0
         };
 
-        // 读取 ID3 (可选)
         if (window.jsmediatags) {
             try {
                 await new Promise((resolve) => {
@@ -176,29 +153,17 @@ async function handleFiles(files) {
             } catch (e) { console.log('Tag read error', e); }
         }
 
-        // 保存到内存
         state.allSongs.push(song);
-        // 保存到数据库 (持久化)
         MusicDB.addSong(song).catch(e => console.error("Save failed", e));
     }
 
     titleElem.innerText = originalTitle;
-    
-    if (state.currentView === 'all-songs') {
-        renderSongList();
-    }
-    updateUIState();
-}
-
-// 辅助：更新侧边栏等状态（如果有）
-function updateUIState() {
-    // 可以在这里更新侧边栏的计数等
+    if (state.currentView === 'all-songs') renderSongList();
 }
 
 // ==========================================
-// 4. 核心播放逻辑 (Playback Logic)
+// 4. 播放逻辑
 // ==========================================
-
 function playSongById(id) {
     const song = state.allSongs.find(s => s.id === id);
     if (!song) return;
@@ -218,12 +183,8 @@ function loadAndPlay(song) {
         return;
     }
 
-    // 释放之前的 URL 以节省内存
-    if (audio.src && audio.src.startsWith('blob:')) {
-        URL.revokeObjectURL(audio.src);
-    }
+    if (audio.src && audio.src.startsWith('blob:')) URL.revokeObjectURL(audio.src);
 
-    // 从 Blob 创建播放 URL
     const fileURL = URL.createObjectURL(song.file);
     audio.src = fileURL;
     audio.play()
@@ -232,7 +193,11 @@ function loadAndPlay(song) {
 
     updatePlayerBar(song);
     addToHistory(song.id);
-    highlightActiveSong(song.id);
+    highlightActiveSong();
+    
+    // 如果队列面板打开，实时刷新
+    const modal = document.getElementById('full-queue-modal');
+    if (modal && !modal.classList.contains('hidden')) renderQueue();
 }
 
 function togglePlay() {
@@ -240,53 +205,37 @@ function togglePlay() {
         if (state.allSongs.length > 0) playSongById(state.allSongs[0].id);
         return;
     }
-
-    if (state.isPlaying) {
-        audio.pause();
-        state.isPlaying = false;
-    } else {
-        audio.play();
-        state.isPlaying = true;
-    }
+    state.isPlaying ? audio.pause() : audio.play();
+    state.isPlaying = !state.isPlaying;
     updatePlayButtonIcon();
 }
 
 function playNext() {
     if (state.currentPlaylist.length === 0) return;
-
     let nextIndex;
     if (state.mode === 'shuffle') {
         nextIndex = Math.floor(Math.random() * state.currentPlaylist.length);
     } else {
         nextIndex = state.currentSongIndex + 1;
-        if (nextIndex >= state.currentPlaylist.length) {
-            nextIndex = 0; 
-        }
+        if (nextIndex >= state.currentPlaylist.length) nextIndex = 0;
     }
-
     state.currentSongIndex = nextIndex;
     loadAndPlay(state.currentPlaylist[nextIndex]);
 }
 
 function playPrev() {
     if (state.currentPlaylist.length === 0) return;
+    if (audio.currentTime > 3) { audio.currentTime = 0; return; }
     
-    if (audio.currentTime > 3) {
-        audio.currentTime = 0;
-        return;
-    }
-
     let prevIndex = state.currentSongIndex - 1;
     if (prevIndex < 0) prevIndex = state.currentPlaylist.length - 1;
-    
     state.currentSongIndex = prevIndex;
     loadAndPlay(state.currentPlaylist[prevIndex]);
 }
 
 function handleSongEnd() {
     if (state.mode === 'one') {
-        audio.currentTime = 0;
-        audio.play();
+        audio.currentTime = 0; audio.play();
     } else {
         playNext();
     }
@@ -294,70 +243,45 @@ function handleSongEnd() {
 
 function toggleMode() {
     const modes = ['sequence', 'shuffle', 'one'];
-    const icons = {
-        'sequence': 'fa-repeat',
-        'shuffle': 'fa-shuffle',
-        'one': 'fa-1' 
-    };
+    const icons = { 'sequence': 'fa-repeat', 'shuffle': 'fa-shuffle', 'one': 'fa-1' };
     
     let currentIdx = modes.indexOf(state.mode);
-    let nextIdx = (currentIdx + 1) % modes.length;
-    state.mode = modes[nextIdx];
+    state.mode = modes[(currentIdx + 1) % modes.length];
     
     const btn = document.getElementById('mode-btn');
     btn.innerHTML = `<i class="fa-solid ${icons[state.mode]}"></i>`;
-    
-    if (state.mode !== 'sequence') {
-        btn.classList.add('active');
-    } else {
-        btn.classList.remove('active');
-    }
+    if (state.mode !== 'sequence') btn.classList.add('active');
+    else btn.classList.remove('active');
 }
 
 // ==========================================
-// 5. UI 渲染与交互 (UI Rendering)
+// 5. UI 渲染
 // ==========================================
-
 function getCurrentViewSongs() {
     let songs = [];
-    if (state.currentView === 'all-songs') {
-        songs = state.allSongs;
-    } else if (state.currentView === 'recent') {
-        songs = state.history.map(id => state.allSongs.find(s => s.id === id)).filter(s => s);
-    } else {
+    if (state.currentView === 'all-songs') songs = state.allSongs;
+    else if (state.currentView === 'recent') songs = state.history.map(id => state.allSongs.find(s => s.id === id)).filter(s => s);
+    else {
         const playlist = state.playlists.find(p => p.id === state.currentView);
-        if (playlist) {
-            songs = playlist.songIds.map(id => state.allSongs.find(s => s.id === id)).filter(s => s);
-        }
+        if (playlist) songs = playlist.songIds.map(id => state.allSongs.find(s => s.id === id)).filter(s => s);
     }
     
     const keyword = document.getElementById('search-input').value.toLowerCase();
-    if (keyword) {
-        songs = songs.filter(s => s.title.toLowerCase().includes(keyword) || s.artist.toLowerCase().includes(keyword));
-    }
-    
+    if (keyword) songs = songs.filter(s => s.title.toLowerCase().includes(keyword) || s.artist.toLowerCase().includes(keyword));
     return songs;
 }
 
 function renderSongList() {
     const listContainer = document.getElementById('song-list');
     const songs = getCurrentViewSongs();
-    
-    const countSpan = document.getElementById('song-count');
-    countSpan.innerText = `${songs.length} 首歌`;
+    document.getElementById('song-count').innerText = `${songs.length} 首歌`;
     
     if (songs.length === 0) {
-        listContainer.innerHTML = `
-            <div class="empty-state">
-                <i class="fa-solid fa-music"></i>
-                <p>这里没有歌曲</p>
-                <button class="btn-secondary" onclick="deleteAllSongs()" style="margin-top:10px;">清空数据库</button>
-            </div>`;
+        listContainer.innerHTML = `<div class="empty-state"><i class="fa-solid fa-music"></i><p>这里没有歌曲</p><button class="btn-secondary" onclick="deleteAllSongs()" style="margin-top:10px;">清空数据库</button></div>`;
         return;
     }
 
     listContainer.innerHTML = ''; 
-
     songs.forEach((song, index) => {
         const row = document.createElement('div');
         row.className = 'song-item';
@@ -371,14 +295,7 @@ function renderSongList() {
         }
         
         row.ondblclick = () => playSongById(song.id);
-        
-        // 移动端/iPad 单击也播放（优化体验）
-        // 简单区分：如果屏幕小，或者想支持单击切歌
-        // row.onclick = () => playSongById(song.id); 
-
-        if (state.allSongs[state.currentSongIndex] && state.allSongs[state.currentSongIndex].id === song.id) {
-            row.classList.add('active');
-        }
+        if (state.allSongs[state.currentSongIndex] && state.allSongs[state.currentSongIndex].id === song.id) row.classList.add('active');
 
         row.innerHTML = `
             <div class="col-index">${index + 1}</div>
@@ -387,12 +304,8 @@ function renderSongList() {
             <div class="col-album">${song.album}</div>
             <div class="col-time">${song.duration ? formatTime(song.duration) : '--:--'}</div>
             <div class="col-actions">
-                <button onclick="openAddToPlaylistModal('${song.id}')" title="添加到播放列表">
-                    <i class="fa-solid fa-plus"></i>
-                </button>
-                <button onclick="removeSong('${song.id}')" title="删除">
-                    <i class="fa-solid fa-trash"></i>
-                </button>
+                <button onclick="openAddToPlaylistModal('${song.id}')"><i class="fa-solid fa-plus"></i></button>
+                <button onclick="removeSong('${song.id}')"><i class="fa-solid fa-trash"></i></button>
             </div>
         `;
         listContainer.appendChild(row);
@@ -402,28 +315,21 @@ function renderSongList() {
 function renderSidebar() {
     const container = document.getElementById('playlist-container');
     container.innerHTML = '';
-    
     state.playlists.forEach(pl => {
         const li = document.createElement('li');
         li.className = 'menu-item';
         if (state.currentView === pl.id) li.classList.add('active');
-        
         li.onclick = (e) => {
             if (e.target.closest('.delete-playlist-btn')) return;
             switchView(pl.id);
         };
-        
-        li.innerHTML = `
-            <i class="fa-solid fa-list"></i> ${pl.name}
-            <i class="fa-solid fa-trash delete-playlist-btn" onclick="deletePlaylist('${pl.id}')" title="删除列表"></i>
-        `;
+        li.innerHTML = `<i class="fa-solid fa-list"></i> ${pl.name} <i class="fa-solid fa-trash delete-playlist-btn" onclick="deletePlaylist('${pl.id}')"></i>`;
         container.appendChild(li);
     });
 }
 
 function switchView(viewId) {
     state.currentView = viewId;
-    
     document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
     if (viewId === 'all-songs' || viewId === 'recent') {
         document.querySelector(`[data-view="${viewId}"]`).classList.add('active');
@@ -433,15 +339,12 @@ function switchView(viewId) {
         if (pl) document.getElementById('view-title').innerText = pl.name;
         renderSidebar(); 
     }
-    
     renderSongList();
 }
 
 function updatePlayerBar(song) {
     document.getElementById('current-name').innerText = song.title;
     document.getElementById('current-artist').innerText = song.artist;
-    // 封面暂时略
-    document.getElementById('current-cover').innerHTML = `<i class="fa-solid fa-compact-disc" style="font-size:24px"></i>`;
 }
 
 function updatePlayButtonIcon() {
@@ -449,38 +352,22 @@ function updatePlayButtonIcon() {
     btn.innerHTML = state.isPlaying ? '<i class="fa-solid fa-pause"></i>' : '<i class="fa-solid fa-play"></i>';
 }
 
-function highlightActiveSong(songId) {
-    renderSongList();
-}
+function highlightActiveSong() { renderSongList(); }
 
-function handleSearch(val) {
-    renderSongList();
-}
+function handleSearch(val) { renderSongList(); }
 
 function sortSongs(field) {
-    // 简单排序，不影响数据库，只影响 allSongs 内存顺序
-    state.allSongs.sort((a, b) => {
-        if (a[field] > b[field]) return 1;
-        if (a[field] < b[field]) return -1;
-        return 0;
-    });
+    state.allSongs.sort((a, b) => (a[field] > b[field] ? 1 : -1));
     renderSongList();
 }
 
 // ==========================================
-// 6. 播放列表与数据管理
+// 6. 播放列表管理
 // ==========================================
-
 function createPlaylist() {
     const name = prompt("请输入播放列表名称", "新建列表");
     if (!name) return;
-    
-    const newPl = {
-        id: 'pl_' + Date.now(),
-        name: name,
-        songIds: []
-    };
-    state.playlists.push(newPl);
+    state.playlists.push({ id: 'pl_' + Date.now(), name: name, songIds: [] });
     savePlaylists();
     renderSidebar();
 }
@@ -493,27 +380,17 @@ function deletePlaylist(id) {
     renderSidebar();
 }
 
-// 删除单个歌曲
 function removeSong(id) {
     if (!confirm("确定从库中删除这首歌吗？")) return;
-    
-    // 1. 内存删除
     state.allSongs = state.allSongs.filter(s => s.id !== id);
-    state.playlists.forEach(pl => {
-        pl.songIds = pl.songIds.filter(sid => sid !== id);
-    });
-    state.history = state.history.filter(sid => sid !== id);
-    
-    // 2. 数据库删除
+    state.playlists.forEach(pl => { pl.songIds = pl.songIds.filter(sid => sid !== id); });
     MusicDB.deleteSong(id);
-    
     savePlaylists();
     renderSongList();
 }
 
-// 开发者功能：清空所有数据
 function deleteAllSongs() {
-    if(confirm("确定清空所有本地存储的音乐吗？")) {
+    if(confirm("确定清空所有音乐吗？")) {
         MusicDB.clearAll();
         state.allSongs = [];
         state.playlists.forEach(p => p.songIds = []);
@@ -523,14 +400,12 @@ function deleteAllSongs() {
     }
 }
 
-// 模态框逻辑
 let songToAddId = null;
 function openAddToPlaylistModal(songId) {
     songToAddId = songId;
     const modal = document.getElementById('modal-add-to-playlist');
     const list = document.getElementById('modal-playlist-list');
     list.innerHTML = '';
-    
     state.playlists.forEach(pl => {
         const li = document.createElement('li');
         li.innerText = pl.name;
@@ -542,25 +417,15 @@ function openAddToPlaylistModal(songId) {
         };
         list.appendChild(li);
     });
-    
     modal.classList.remove('hidden');
 }
 
-function closeModal() {
-    document.getElementById('modal-add-to-playlist').classList.add('hidden');
-}
-
-function savePlaylists() {
-    localStorage.setItem('myMusic_playlists', JSON.stringify(state.playlists));
-}
-
+function closeModal() { document.getElementById('modal-add-to-playlist').classList.add('hidden'); }
+function savePlaylists() { localStorage.setItem('myMusic_playlists', JSON.stringify(state.playlists)); }
 function loadPlaylists() {
     const data = localStorage.getItem('myMusic_playlists');
-    if (data) {
-        state.playlists = JSON.parse(data);
-    }
+    if (data) state.playlists = JSON.parse(data);
 }
-
 function addToHistory(songId) {
     state.history = state.history.filter(id => id !== songId);
     state.history.unshift(songId);
@@ -568,43 +433,103 @@ function addToHistory(songId) {
 }
 
 // ==========================================
-// 7. 拖拽排序 (Drag & Drop)
+// 7. 拖拽排序 (Sidebar Playlists)
 // ==========================================
 function handleDragStart(e, index) {
     state.dragStartIndex = index;
     e.target.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
 }
-
-function handleDragOver(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-}
-
+function handleDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
 function handleDrop(e, dropIndex) {
     e.preventDefault();
     const startIndex = state.dragStartIndex;
-    
     if (startIndex === null || startIndex === dropIndex) return;
-
     const playlist = state.playlists.find(p => p.id === state.currentView);
     if (!playlist) return; 
-    
     const list = playlist.songIds;
     const [movedItem] = list.splice(startIndex, 1);
     list.splice(dropIndex, 0, movedItem);
-    
     savePlaylists();
     renderSongList();
 }
-
-function handleDragEnd(e) {
-    e.target.classList.remove('dragging');
-    state.dragStartIndex = null;
-}
+function handleDragEnd(e) { e.target.classList.remove('dragging'); state.dragStartIndex = null; }
 
 // ==========================================
-// 8. 辅助函数 (Utils)
+// 8. 全屏队列与拖拽排序
+// ==========================================
+function toggleQueue() {
+    const modal = document.getElementById('full-queue-modal');
+    const btn = document.getElementById('queue-btn');
+    if (modal.classList.contains('hidden')) {
+        modal.classList.remove('hidden');
+        btn.classList.add('active');
+        renderQueue();
+    } else {
+        modal.classList.add('hidden');
+        btn.classList.remove('active');
+    }
+}
+
+function renderQueue() {
+    const container = document.getElementById('queue-content-list');
+    container.innerHTML = '';
+    if (state.currentPlaylist.length === 0) {
+        container.innerHTML = '<div style="padding:40px; text-align:center; color:#999;">队列为空</div>';
+        return;
+    }
+    state.currentPlaylist.forEach((song, index) => {
+        const div = document.createElement('div');
+        div.className = 'queue-list-item';
+        if (index === state.currentSongIndex) div.classList.add('active');
+        
+        div.setAttribute('draggable', 'true');
+        div.addEventListener('dragstart', (e) => handleQueueDragStart(e, index));
+        div.addEventListener('dragover', handleQueueDragOver);
+        div.addEventListener('drop', (e) => handleQueueDrop(e, index));
+        div.addEventListener('dragend', handleQueueDragEnd);
+        
+        div.onclick = (e) => {
+            if (e.target.closest('.queue-drag-handle')) return;
+            state.currentSongIndex = index;
+            loadAndPlay(song);
+        };
+        div.innerHTML = `
+            <div class="q-status-icon">${index === state.currentSongIndex ? '<i class="fa-solid fa-volume-high"></i>' : (index + 1)}</div>
+            <div class="q-info-box"><div class="q-title">${song.title}</div><div class="q-artist">${song.artist}</div></div>
+            <div class="queue-drag-handle"><i class="fa-solid fa-bars"></i></div>
+        `;
+        container.appendChild(div);
+    });
+}
+
+function handleQueueDragStart(e, index) {
+    state.queueDragStartIndex = index;
+    e.target.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', null);
+}
+function handleQueueDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+function handleQueueDrop(e, dropIndex) {
+    e.preventDefault();
+    const startIndex = state.queueDragStartIndex;
+    if (startIndex === null || startIndex === dropIndex) return;
+    
+    const currentPlayingSongId = state.currentPlaylist[state.currentSongIndex] ? state.currentPlaylist[state.currentSongIndex].id : null;
+    const list = state.currentPlaylist;
+    const [movedItem] = list.splice(startIndex, 1);
+    list.splice(dropIndex, 0, movedItem);
+    
+    if (currentPlayingSongId) {
+        const newIndex = list.findIndex(s => s.id === currentPlayingSongId);
+        if (newIndex !== -1) state.currentSongIndex = newIndex;
+    }
+    renderQueue();
+}
+function handleQueueDragEnd(e) { e.target.classList.remove('dragging'); state.queueDragStartIndex = null; renderQueue(); }
+
+// ==========================================
+// 9. 辅助函数
 // ==========================================
 function formatTime(seconds) {
     if (isNaN(seconds)) return "0:00";
@@ -612,33 +537,20 @@ function formatTime(seconds) {
     const sec = Math.floor(seconds % 60);
     return `${min}:${sec < 10 ? '0' : ''}${sec}`;
 }
-
 function updateProgress() {
     const current = audio.currentTime;
-    const duration = audio.duration;
     document.getElementById('seek-bar').value = current;
     document.getElementById('current-time').innerText = formatTime(current);
 }
-
-function handleSeek(val) {
-    audio.currentTime = val;
-}
-
+function handleSeek(val) { audio.currentTime = val; }
 function handleVolume(val) {
-    audio.volume = val;
-    state.volume = val;
+    audio.volume = val; state.volume = val;
     const icon = document.getElementById('vol-icon');
     if (val == 0) icon.className = "fa-solid fa-volume-xmark";
     else if (val < 0.5) icon.className = "fa-solid fa-volume-low";
     else icon.className = "fa-solid fa-volume-high";
 }
-
 function toggleMute() {
-    if (audio.volume > 0) {
-        audio.volume = 0;
-        document.getElementById('volume-bar').value = 0;
-    } else {
-        audio.volume = state.volume || 1;
-        document.getElementById('volume-bar').value = state.volume || 1;
-    }
+    if (audio.volume > 0) { audio.volume = 0; document.getElementById('volume-bar').value = 0; }
+    else { audio.volume = state.volume || 1; document.getElementById('volume-bar').value = state.volume || 1; }
 }
