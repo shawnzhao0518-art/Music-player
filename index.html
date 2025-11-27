@@ -3,524 +3,137 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>macOS Sequoia Web</title>
-    <style>
-        /* --- 系统级 CSS 变量 --- */
-        :root {
-            --bg-image: url('https://4kwallpapers.com/images/wallpapers/macos-sequoia-light-stock-6016x3384-15638.jpg');
-            --dock-bg: rgba(255, 255, 255, 0.25);
-            --window-bg: rgba(255, 255, 255, 0.85);
-            --menu-bg: rgba(255, 255, 255, 0.35);
-            --blur-strength: 25px;
-            --shadow-active: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-            --shadow-inactive: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            --font-stack: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
-        }
-
-        body {
-            margin: 0;
-            overflow: hidden;
-            font-family: var(--font-stack);
-            background: var(--bg-image) no-repeat center center fixed;
-            background-size: cover;
-            height: 100vh;
-            user-select: none;
-            cursor: default;
-        }
-
-        /* --- 顶部菜单栏 --- */
-        .menubar {
-            height: 28px;
-            background: var(--menu-bg);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 16px;
-            color: #000;
-            font-size: 13px;
-            font-weight: 500;
-            position: relative;
-            z-index: 9999;
-            box-shadow: 0 1px 5px rgba(0,0,0,0.05);
-        }
-        .menubar-left { display: flex; gap: 18px; }
-        .menubar-right { display: flex; gap: 15px; }
-        .apple-logo { font-size: 16px; margin-right: 4px; }
-
-        /* --- 窗口基础样式 --- */
-        .window {
-            position: absolute;
-            background: var(--window-bg);
-            backdrop-filter: blur(var(--blur-strength));
-            -webkit-backdrop-filter: blur(var(--blur-strength));
-            border-radius: 12px;
-            box-shadow: var(--shadow-active);
-            border: 1px solid rgba(255, 255, 255, 0.4);
-            display: none;
-            flex-direction: column;
-            overflow: hidden;
-            transition: transform 0.15s, opacity 0.15s, width 0.2s, height 0.2s;
-            animation: openWindow 0.3s cubic-bezier(0.19, 1, 0.22, 1);
-        }
-        
-        .window.minimized {
-            transform: scale(0) translateY(300px);
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        @keyframes openWindow {
-            0% { transform: scale(0.8); opacity: 0; }
-            100% { transform: scale(1); opacity: 1; }
-        }
-
-        /* --- 窗口标题栏 --- */
-        .title-bar {
-            height: 38px;
-            display: flex;
-            align-items: center;
-            padding-left: 12px;
-            background: transparent;
-            cursor: default; /* 拖拽区域 */
-        }
-        
-        .traffic-lights {
-            display: flex;
-            gap: 8px;
-            z-index: 10;
-        }
-        
-        .traffic-light {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            position: relative;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 8px;
-            color: rgba(0,0,0,0.5);
-            opacity: 1;
-        }
-        
-        .traffic-lights:hover .traffic-light::after { content: ''; } /* 简化的hover占位 */
-        
-        .close { background: #ff5f57; border: 1px solid #e0443e; }
-        .minimize { background: #febc2e; border: 1px solid #dba52d; }
-        .maximize { background: #28c840; border: 1px solid #1aab29; }
-
-        /* 鼠标悬停在红绿灯时显示符号 */
-        .traffic-lights:hover .close::before { content: '×'; }
-        .traffic-lights:hover .minimize::before { content: '−'; }
-        .traffic-lights:hover .maximize::before { content: '+'; }
-
-        .window-content {
-            flex: 1;
-            position: relative;
-            overflow: auto;
-        }
-
-        /* --- 底部 Dock 栏 --- */
-        .dock-wrapper {
-            position: absolute;
-            bottom: 10px;
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            z-index: 10000;
-        }
-        
-        .dock {
-            background: var(--dock-bg);
-            backdrop-filter: blur(var(--blur-strength));
-            -webkit-backdrop-filter: blur(var(--blur-strength));
-            border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 24px;
-            padding: 8px;
-            display: flex;
-            gap: 12px;
-            align-items: flex-end;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.15);
-        }
-
-        .app-icon {
-            width: 55px;
-            height: 55px;
-            border-radius: 14px;
-            cursor: pointer;
-            transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1), margin-bottom 0.2s;
-            position: relative;
-            background-size: cover;
-            background-color: #eee;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 30px;
-        }
-
-        .app-icon:hover {
-            transform: scale(1.15) translateY(-10px);
-            margin: 0 5px;
-        }
-
-        .app-icon::after {
-            content: '';
-            position: absolute;
-            bottom: -15px;
-            width: 4px;
-            height: 4px;
-            background: black;
-            border-radius: 50%;
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-        .app-icon.active::after { opacity: 0.6; }
-
-        /* --- 应用特定样式 --- */
-        
-        /* 记事本 */
-        .notepad-area {
-            width: 100%;
-            height: 100%;
-            border: none;
-            background: transparent;
-            resize: none;
-            padding: 15px;
-            font-family: inherit;
-            font-size: 16px;
-            box-sizing: border-box;
-            outline: none;
-            color: #333;
-            line-height: 1.5;
-        }
-
-        /* 计算器 */
-        .calc-body {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1px;
-            background: #d0d0d0; /* Grid lines color */
-            height: 100%;
-        }
-        .calc-screen {
-            grid-column: span 4;
-            background: rgba(40,40,40,0.9);
-            color: white;
-            font-size: 40px;
-            text-align: right;
-            padding: 15px;
-            font-weight: 300;
-        }
-        .calc-btn {
-            border: none;
-            background: rgba(255,255,255,0.9);
-            font-size: 20px;
-            cursor: pointer;
-            padding: 20px 0;
-        }
-        .calc-btn:active { background: #ccc; }
-        .calc-btn.orange { background: #ff9f0a; color: white; }
-        .calc-btn.orange:active { background: #d78608; }
-        .calc-btn.wide { grid-column: span 2; }
-
-        /* 浏览器 */
-        .browser-bar {
-            height: 36px;
-            background: #f0f0f0;
-            display: flex;
-            align-items: center;
-            padding: 0 10px;
-            gap: 10px;
-            border-bottom: 1px solid #ddd;
-        }
-        .url-input {
-            flex: 1;
-            border-radius: 6px;
-            border: none;
-            background: #dcdcdc;
-            padding: 5px 10px;
-            font-size: 13px;
-            text-align: center;
-            outline: none;
-        }
-        .url-input:focus { background: white; text-align: left; border: 2px solid #007aff; }
-
-    </style>
+    <title>Web Music Player - Simplified Apple Music</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
 </head>
 <body>
 
-    <div class="menubar">
-        <div class="menubar-left">
-            <span class="apple-logo"></span>
-            <span style="font-weight: 700;">Finder</span>
-            <span>File</span>
-            <span>Edit</span>
-            <span>View</span>
-            <span>Go</span>
-            <span>Window</span>
-            <span>Help</span>
-        </div>
-        <div class="menubar-right">
-            <span>🔋 100%</span>
-            <span>📶 Wi-Fi</span>
-            <span>🔍</span>
-            <span>🎛️</span>
-            <span id="clock">Mon Jun 22 9:41 AM</span>
-        </div>
-    </div>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <i class="fa-brands fa-apple" style="font-size: 24px;"></i>
+                <span>Music</span>
+            </div>
+            
+            <div class="menu-group">
+                <div class="menu-label">资料库</div>
+                <ul>
+                    <li class="menu-item active" data-view="all-songs" onclick="switchView('all-songs')">
+                        <i class="fa-solid fa-music"></i> 全部歌曲
+                    </li>
+                    <li class="menu-item" data-view="recent" onclick="switchView('recent')">
+                        <i class="fa-solid fa-clock-rotate-left"></i> 最近播放
+                    </li>
+                </ul>
+            </div>
 
-    <div class="window" id="app-notes" style="width: 500px; height: 350px; top: 100px; left: 200px;">
-        <div class="title-bar" onmousedown="startDrag(event, 'app-notes')">
-            <div class="traffic-lights">
-                <div class="traffic-light close" onclick="closeApp('app-notes')"></div>
-                <div class="traffic-light minimize" onclick="minimizeApp('app-notes')"></div>
-                <div class="traffic-light maximize" onclick="maximizeApp('app-notes')"></div>
+            <div class="menu-group">
+                <div class="menu-label-row">
+                    <span class="menu-label">播放列表</span>
+                    <button class="icon-btn-small" onclick="createPlaylist()" title="新建列表">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                </div>
+                <ul id="playlist-container">
+                    </ul>
             </div>
-            <div style="flex:1; text-align: center; color: #555; font-size: 13px;">Notes</div>
-        </div>
-        <div class="window-content">
-            <textarea id="note-content" class="notepad-area" placeholder="在这里输入内容，系统会自动保存..."></textarea>
-        </div>
-    </div>
+        </aside>
 
-    <div class="window" id="app-calc" style="width: 260px; height: 360px; top: 150px; left: 300px;">
-        <div class="title-bar" onmousedown="startDrag(event, 'app-calc')" style="background: #333;">
-            <div class="traffic-lights">
-                <div class="traffic-light close" onclick="closeApp('app-calc')"></div>
-                <div class="traffic-light minimize" onclick="minimizeApp('app-calc')"></div>
-                <div class="traffic-light maximize"></div>
-            </div>
-        </div>
-        <div class="window-content" style="overflow: hidden;">
-            <div class="calc-body">
-                <div class="calc-screen" id="calc-display">0</div>
-                <button class="calc-btn" onclick="calcInput('C')">AC</button>
-                <button class="calc-btn" onclick="calcInput('+/-')">+/-</button>
-                <button class="calc-btn" onclick="calcInput('%')">%</button>
-                <button class="calc-btn orange" onclick="calcInput('/')">÷</button>
-                <button class="calc-btn" onclick="calcInput('7')">7</button>
-                <button class="calc-btn" onclick="calcInput('8')">8</button>
-                <button class="calc-btn" onclick="calcInput('9')">9</button>
-                <button class="calc-btn orange" onclick="calcInput('*')">×</button>
-                <button class="calc-btn" onclick="calcInput('4')">4</button>
-                <button class="calc-btn" onclick="calcInput('5')">5</button>
-                <button class="calc-btn" onclick="calcInput('6')">6</button>
-                <button class="calc-btn orange" onclick="calcInput('-')">-</button>
-                <button class="calc-btn" onclick="calcInput('1')">1</button>
-                <button class="calc-btn" onclick="calcInput('2')">2</button>
-                <button class="calc-btn" onclick="calcInput('3')">3</button>
-                <button class="calc-btn orange" onclick="calcInput('+')">+</button>
-                <button class="calc-btn wide" onclick="calcInput('0')">0</button>
-                <button class="calc-btn" onclick="calcInput('.')">.</button>
-                <button class="calc-btn orange" onclick="calcInput('=')">=</button>
-            </div>
-        </div>
-    </div>
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="search-input" placeholder="搜索歌曲、艺人..." oninput="handleSearch(this.value)">
+                </div>
+                <div class="actions">
+                    <input type="file" id="file-upload" multiple accept="audio/*" style="display: none;" onchange="handleFiles(this.files)">
+                    <button class="btn-primary" onclick="document.getElementById('file-upload').click()">
+                        <i class="fa-solid fa-upload"></i> 导入音乐
+                    </button>
+                </div>
+            </header>
 
-    <div class="window" id="app-safari" style="width: 800px; height: 500px; top: 80px; left: 150px;">
-        <div class="title-bar" onmousedown="startDrag(event, 'app-safari')" style="background: #f0f0f0;">
-            <div class="traffic-lights">
-                <div class="traffic-light close" onclick="closeApp('app-safari')"></div>
-                <div class="traffic-light minimize" onclick="minimizeApp('app-safari')"></div>
-                <div class="traffic-light maximize" onclick="maximizeApp('app-safari')"></div>
-            </div>
-            <div style="flex:1;"></div>
-        </div>
-        <div class="browser-bar">
-            <span style="cursor:pointer; font-size:18px;">🔙</span>
-            <span style="cursor:pointer; font-size:18px;">🔜</span>
-            <input type="text" class="url-input" value="bing.com" id="browser-url" onkeydown="if(event.key === 'Enter') loadUrl()">
-            <span style="cursor:pointer;">🔄</span>
-        </div>
-        <div class="window-content">
-            <iframe id="browser-frame" src="https://www.bing.com" style="width:100%; height:100%; border:none;"></iframe>
-        </div>
-    </div>
+            <div class="content-view">
+                <div class="view-header">
+                    <h1 id="view-title">全部歌曲</h1>
+                    <span id="song-count">0 首歌</span>
+                </div>
 
-    <div class="window" id="app-settings" style="width: 600px; height: 400px; top: 120px; left: 180px;">
-        <div class="title-bar" onmousedown="startDrag(event, 'app-settings')">
-            <div class="traffic-lights">
-                <div class="traffic-light close" onclick="closeApp('app-settings')"></div>
-                <div class="traffic-light minimize" onclick="minimizeApp('app-settings')"></div>
-                <div class="traffic-light maximize"></div>
-            </div>
-            <div style="flex:1; text-align: center; color: #555; font-size: 13px;">System Settings</div>
-        </div>
-        <div class="window-content" style="background: #f5f5f7; display: flex;">
-            <div style="width: 180px; border-right: 1px solid #ddd; padding: 10px;">
-                <div style="padding: 5px 10px; background: #e3e3e3; border-radius: 5px;">Appearance</div>
-                <div style="padding: 5px 10px;">Wallpaper</div>
-                <div style="padding: 5px 10px;">Control Center</div>
-            </div>
-            <div style="flex: 1; padding: 20px; display: flex; justify-content: center; align-items: center;">
-                <div style="text-align: center;">
-                    <h2 style="margin-bottom: 10px;">macOS Sequoia</h2>
-                    <p style="color: #888;">Web Edition v1.0</p>
+                <div class="song-table-header">
+                    <div class="col-index">#</div>
+                    <div class="col-title sortable" onclick="sortSongs('title')">标题</div>
+                    <div class="col-artist sortable" onclick="sortSongs('artist')">艺人</div>
+                    <div class="col-album">专辑</div>
+                    <div class="col-time sortable" onclick="sortSongs('duration')">时长</div>
+                    <div class="col-actions">操作</div>
+                </div>
+                <div id="song-list" class="song-list-container">
+                    <div class="empty-state">
+                        <i class="fa-solid fa-music"></i>
+                        <p>还没有音乐，点击右上角导入</p>
+                    </div>
                 </div>
             </div>
+        </main>
+    </div>
+
+    <footer class="player-bar">
+        <div class="player-info">
+            <div class="cover-art" id="current-cover">
+                <i class="fa-solid fa-music"></i>
+            </div>
+            <div class="track-details">
+                <div class="track-name" id="current-name">未播放</div>
+                <div class="track-artist" id="current-artist">--</div>
+            </div>
+        </div>
+
+        <div class="player-controls-container">
+            <div class="control-buttons">
+                <button class="ctrl-btn icon-only" id="mode-btn" onclick="toggleMode()" title="顺序播放">
+                    <i class="fa-solid fa-repeat"></i> </button>
+                
+                <button class="ctrl-btn" onclick="playPrev()">
+                    <i class="fa-solid fa-backward-step"></i>
+                </button>
+                
+                <button class="ctrl-btn play-pause-btn" id="play-pause-btn" onclick="togglePlay()">
+                    <i class="fa-solid fa-play"></i>
+                </button>
+                
+                <button class="ctrl-btn" onclick="playNext()">
+                    <i class="fa-solid fa-forward-step"></i>
+                </button>
+
+                <button class="ctrl-btn icon-only disabled">
+                    <i class="fa-solid fa-list-ul"></i>
+                </button>
+            </div>
+            
+            <div class="progress-section">
+                <span class="time-text" id="current-time">0:00</span>
+                <input type="range" id="seek-bar" value="0" min="0" step="0.1" oninput="handleSeek(this.value)">
+                <span class="time-text" id="total-duration">0:00</span>
+            </div>
+        </div>
+
+        <div class="player-volume">
+            <i class="fa-solid fa-volume-high" id="vol-icon" onclick="toggleMute()"></i>
+            <input type="range" id="volume-bar" min="0" max="1" step="0.05" value="1" oninput="handleVolume(this.value)">
+        </div>
+    </footer>
+
+    <div id="modal-add-to-playlist" class="modal hidden">
+        <div class="modal-content">
+            <h3>添加到播放列表</h3>
+            <ul id="modal-playlist-list">
+                </ul>
+            <button class="btn-secondary" onclick="closeModal()">取消</button>
         </div>
     </div>
 
-    <div class="dock-wrapper">
-        <div class="dock">
-            <div class="app-icon" style="background: linear-gradient(#1c92d2, #f2fcfe);" onclick="alert('Finder 即将推出')">😊</div>
-            <div class="app-icon" id="dock-safari" style="background: white;" onclick="openApp('app-safari')">🧭</div>
-            <div class="app-icon" id="dock-notes" style="background: linear-gradient(to bottom, #ffe873, #ffcd00);" onclick="openApp('app-notes')">📝</div>
-            <div class="app-icon" id="dock-settings" style="background: #bbb;" onclick="openApp('app-settings')">⚙️</div>
-            <div class="app-icon" id="dock-calc" style="background: #333; color: white;" onclick="openApp('app-calc')">🧮</div>
-            <div class="app-icon" style="background: #2c2c32; color: #007acc;" onclick="window.open('https://github.com', '_blank')">💻</div>
-        </div>
-    </div>
-
-    <script>
-        // --- 1. 系统时钟 ---
-        function updateClock() {
-            const now = new Date();
-            const options = { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' };
-            document.getElementById('clock').innerText = now.toLocaleDateString('en-US', options);
-        }
-        setInterval(updateClock, 1000);
-        updateClock();
-
-        // --- 2. 窗口管理系统 (Core OS Logic) ---
-        let maxZIndex = 100;
-        let activeWindow = null;
-
-        function openApp(appId) {
-            const win = document.getElementById(appId);
-            const dockIcon = document.getElementById(appId.replace('app-', 'dock-'));
-            
-            // 动画重置
-            win.style.display = 'flex';
-            requestAnimationFrame(() => {
-                win.classList.remove('minimized');
-            });
-            
-            bringToFront(win);
-            
-            // 标记 Dock 状态
-            if(dockIcon) dockIcon.classList.add('active');
-        }
-
-        function closeApp(appId) {
-            const win = document.getElementById(appId);
-            win.style.display = 'none'; // 简单关闭
-            // 实际 Mac 关闭窗口不一定退出 App，但 Web 版简化处理
-            const dockIcon = document.getElementById(appId.replace('app-', 'dock-'));
-            if(dockIcon) dockIcon.classList.remove('active');
-        }
-
-        function minimizeApp(appId) {
-            const win = document.getElementById(appId);
-            win.classList.add('minimized');
-        }
-
-        function maximizeApp(appId) {
-            const win = document.getElementById(appId);
-            if (win.style.width === '100%') {
-                // 还原 (这只是个简单的还原逻辑，实际需要记录上次位置)
-                win.style.width = '600px'; 
-                win.style.height = '400px';
-                win.style.top = '100px';
-                win.style.left = '100px';
-            } else {
-                win.style.width = '100%';
-                win.style.height = 'calc(100vh - 60px)'; // 减去 Dock 和 Menu
-                win.style.top = '28px'; // Menu height
-                win.style.left = '0';
-            }
-        }
-
-        function bringToFront(element) {
-            maxZIndex++;
-            element.style.zIndex = maxZIndex;
-            activeWindow = element;
-        }
-
-        // 点击窗口任意位置置顶
-        document.querySelectorAll('.window').forEach(win => {
-            win.addEventListener('mousedown', () => bringToFront(win));
-        });
-
-        // --- 3. 完美拖拽逻辑 (无卡顿) ---
-        let isDragging = false;
-        let currentDragWin = null;
-        let offset = { x: 0, y: 0 };
-
-        function startDrag(e, id) {
-            e.preventDefault(); // 防止选中文字
-            isDragging = true;
-            currentDragWin = document.getElementById(id);
-            bringToFront(currentDragWin);
-            
-            const rect = currentDragWin.getBoundingClientRect();
-            offset.x = e.clientX - rect.left;
-            offset.y = e.clientY - rect.top;
-            
-            document.addEventListener('mousemove', onDrag);
-            document.addEventListener('mouseup', stopDrag);
-        }
-
-        function onDrag(e) {
-            if (!isDragging) return;
-            
-            let x = e.clientX - offset.x;
-            let y = e.clientY - offset.y;
-            
-            // 边界检查 (防止拖出屏幕太远)
-            if (y < 28) y = 28; // 不能挡住菜单栏
-            
-            currentDragWin.style.left = x + 'px';
-            currentDragWin.style.top = y + 'px';
-        }
-
-        function stopDrag() {
-            isDragging = false;
-            currentDragWin = null;
-            document.removeEventListener('mousemove', onDrag);
-            document.removeEventListener('mouseup', stopDrag);
-        }
-
-        // --- 4. 应用逻辑 ---
-
-        // 计算器逻辑
-        let calcVal = '0';
-        function calcInput(val) {
-            const display = document.getElementById('calc-display');
-            if (val === 'C') {
-                calcVal = '0';
-            } else if (val === '=') {
-                try {
-                    calcVal = eval(calcVal).toString();
-                } catch {
-                    calcVal = 'Error';
-                }
-            } else {
-                if (calcVal === '0') calcVal = val;
-                else calcVal += val;
-            }
-            display.innerText = calcVal;
-        }
-
-        // 记事本自动保存 (LocalStorage)
-        const noteArea = document.getElementById('note-content');
-        if(localStorage.getItem('macOS_Note')) {
-            noteArea.value = localStorage.getItem('macOS_Note');
-        }
-        noteArea.addEventListener('input', () => {
-            localStorage.setItem('macOS_Note', noteArea.value);
-        });
-
-        // 浏览器逻辑
-        function loadUrl() {
-            let url = document.getElementById('browser-url').value;
-            if(!url.startsWith('http')) url = 'https://' + url;
-            document.getElementById('browser-frame').src = url;
-        }
-
-    </script>
+    <script src="app.js"></script>
 </body>
 </html>
