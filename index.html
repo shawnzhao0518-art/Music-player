@@ -1,185 +1,116 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Music</title>
-<link rel="icon" type="image/png" href="logo.png">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-<link rel="stylesheet" href="style.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShawnMusic Player</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
 <body>
-<div class="app-container">
-    <aside class="sidebar">
-        <div class="sidebar-header">
-            <div class="logo-container">
-                <img src="logo.png" alt="Logo" class="app-logo">
-            </div>
-            <span>Music</span>
-        </div>
-        
-        <div class="scrollable-menu">
-            <div class="menu-group">
-                <div class="menu-label">Library</div>
-                <ul>
-                    <li class="menu-item active" data-view="all-songs" onclick="switchView('all-songs')">
-                        <i class="fa-solid fa-music"></i> All Songs
-                    </li>
-                    <li class="menu-item" data-view="recent" onclick="switchView('recent')">
-                        <i class="fa-solid fa-clock-rotate-left"></i> Recently Played
-                    </li>
-                </ul>
-            </div>
-            <div class="menu-group">
-                <div class="menu-label-row">
-                    <span class="menu-label">Playlists</span>
-                    <button class="icon-btn-small" onclick="createPlaylist()">
-                        <i class="fa-solid fa-plus"></i>
-                    </button>
-                </div>
-                <ul id="playlist-container"></ul>
-            </div>
-        </div>
-    </aside>
 
-    <main class="main-content">
-        <header class="top-bar glass">
-            <div class="search-wrapper">
-                <i class="fa-solid fa-magnifying-glass"></i>
-                <input type="text" id="search-input" placeholder="Search" oninput="handleSearch(this.value)">
-            </div>
-            <div class="actions">
-                <input type="file" id="file-upload" multiple accept=".mp3, .m4a, .wav, .flac, .ogg, audio/*" style="display: none;" onchange="handleFiles(this.files)">
-                <button class="btn-primary" onclick="document.getElementById('file-upload').click()">
-                    <i class="fa-solid fa-arrow-up-from-bracket"></i> Import
-                </button>
-            </div>
-        </header>
-
-        <div class="content-view">
-            <div class="view-header">
-                <h1 id="view-title">All Songs</h1>
-                <span id="song-count">0 songs</span>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="logo-area">
+                <img src="logo.png" alt="ShawnMusic Logo" class="logo">
+                <h2>ShawnMusic</h2>
             </div>
             
-            <div class="song-table-header">
-                <div class="col-index">#</div>
-                <div class="col-title sortable" onclick="sortSongs('title')">Title</div>
-                <div class="col-artist sortable" onclick="sortSongs('artist')">Artist</div>
-                <div class="col-album">Album</div>
-                <div class="col-time sortable" onclick="sortSongs('duration')"><i class="fa-regular fa-clock"></i></div>
-                <div class="col-actions"></div>
+            <nav class="nav-links">
+                <a href="#" class="active"><span class="material-icons">home</span> 现在的音乐</a>
+                <a href="#"><span class="material-icons">search</span> 搜索</a>
+                <a href="#"><span class="material-icons">library_music</span> 资料库</a>
+            </nav>
+
+            <div class="playlists">
+                <h3>播放列表</h3>
+                <ul>
+                    <li><span class="material-icons">queue_music</span> 我的最爱</li>
+                    <li><span class="material-icons">queue_music</span> 跑步歌单</li>
+                    <li><span class="material-icons">queue_music</span> 睡眠音乐</li>
+                </ul>
             </div>
-            <div id="song-list" class="song-list-container"></div>
-        </div>
-    </main>
-</div>
+        </aside>
 
-<div id="full-player-modal" class="full-player-modal hidden">
-    <div class="fp-background-blur"></div>
-    <div class="fp-header">
-        <button class="fp-close-btn" onclick="closeFullScreen()">
-            <i class="fa-solid fa-chevron-down"></i>
-        </button>
-    </div>
-    
-    <div class="fp-content">
-        <div class="fp-cover-container">
-            <div class="fp-cover" id="fp-cover"></div>
-        </div>
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="search-bar">
+                    <span class="material-icons">search</span>
+                    <input type="text" placeholder="搜索本地歌曲...">
+                </div>
+                <div class="top-actions">
+                    <button id="batch-btn" class="icon-btn-text">
+                        <span class="material-icons">select_all</span> 批量
+                    </button>
+                    <input type="file" id="file-input" accept="audio/*" multiple hidden>
+                    <button id="import-btn" class="primary-btn">
+                        <span class="material-icons">add</span> 导入音乐
+                    </button>
+                    <div class="user-profile">
+                        <span class="material-icons">account_circle</span>
+                    </div>
+                </div>
+            </header>
 
-        <div class="fp-info">
-            <div class="fp-text">
-                <h2 id="fp-title">Not Playing</h2>
-                <p id="fp-artist">--</p>
+            <div class="content-scroll">
+                <div class="hero-section">
+                    <h1>本地音乐库</h1>
+                    <p>享受极致的本地播放体验</p>
+                </div>
+
+                <div class="song-list-header">
+                    <span>歌曲</span>
+                    <span>歌手</span>
+                    <span>专辑</span>
+                    <span>时长</span>
+                    <span>操作</span>
+                </div>
+
+                <ul id="song-list" class="song-list">
+                    </ul>
             </div>
-            <button class="fp-btn-s" onclick="openMoreOptionsModal(state.allSongs[state.currentSongIndex]?.id)">
-                <i class="fa-solid fa-ellipsis"></i>
-            </button>
-        </div>
+        </main>
 
-        <div class="fp-progress-container">
-            <input type="range" id="seek-bar-fs" value="0" min="0" step="0.1" oninput="handleSeek(this.value)">
-            <div class="fp-times">
-                <span id="current-time-fs">0:00</span>
-                <span id="total-duration-fs">0:00</span>
+        <footer class="player-bar">
+            <div class="now-playing">
+                <div class="cover-thumb" id="mini-cover"></div>
+                <div class="track-info">
+                    <h4 id="current-title">未播放</h4>
+                    <p id="current-artist">--</p>
+                </div>
+            </div>
+
+            <div class="player-controls">
+                <div class="control-buttons">
+                    <button class="icon-btn" id="prev-btn"><span class="material-icons">skip_previous</span></button>
+                    <button class="play-btn" id="play-pause-btn"><span class="material-icons">play_circle_filled</span></button>
+                    <button class="icon-btn" id="next-btn"><span class="material-icons">skip_next</span></button>
+                </div>
+                <div class="progress-area">
+                    <span id="current-time">0:00</span>
+                    <input type="range" id="progress-bar" value="0" min="0" max="100">
+                    <span id="total-duration">0:00</span>
+                </div>
+            </div>
+
+            <div class="volume-controls">
+                <span class="material-icons">volume_up</span>
+                <input type="range" id="volume-slider" min="0" max="1" step="0.1" value="1">
+            </div>
+        </footer>
+
+        <div id="batch-action-bar" class="batch-action-bar hidden">
+            <div class="batch-info">已选择 <span id="selected-count">0</span> 首歌曲</div>
+            <div class="batch-buttons">
+                <button id="batch-add-playlist"><span class="material-icons">playlist_add</span> 添加到歌单</button>
+                <button id="batch-export"><span class="material-icons">download</span> 导出</button>
+                <button id="batch-delete" class="danger"><span class="material-icons">delete</span> 删除</button>
+                <button id="batch-cancel"><span class="material-icons">close</span> 取消</button>
             </div>
         </div>
 
-        <div class="fp-controls">
-            <button class="fp-btn-s" id="mode-btn-fs" onclick="toggleMode()"><i class="fa-solid fa-repeat"></i></button>
-            <div class="fp-main-ctrls">
-                <button class="fp-btn-m" onclick="playPrev()"><i class="fa-solid fa-backward-step"></i></button>
-                <button class="fp-btn-l" id="play-btn-fs" onclick="togglePlay()"><i class="fa-solid fa-play"></i></button>
-                <button class="fp-btn-m" onclick="playNext()"><i class="fa-solid fa-forward-step"></i></button>
-            </div>
-            <button class="fp-btn-s" style="opacity: 0; pointer-events: none;"><i class="fa-solid fa-volume-high"></i></button>
-        </div>
-    </div>
-</div>
-
-<div id="full-queue-modal" class="queue-modal hidden">
-    <div class="queue-modal-header">
-        <h3>Playing Next</h3>
-        <button class="btn-done" onclick="toggleQueue()">Done</button>
-    </div>
-    <div class="queue-modal-content" id="queue-content-list"></div>
-</div>
-
-<footer class="player-bar glass" id="mini-player" onclick="openFullScreen(event)">
-    <div class="player-info">
-        <div class="cover-art" id="current-cover"></div>
-        <div class="track-details">
-            <div class="track-name" id="current-name">Not Playing</div>
-            <div class="track-artist" id="current-artist">--</div>
-        </div>
-    </div>
-    
-    <div class="player-controls-container">
-        <div class="control-buttons">
-            <button class="ctrl-btn" onclick="playPrev()"><i class="fa-solid fa-backward-step"></i></button>
-            <button class="ctrl-btn play-pause-btn" id="play-pause-btn" onclick="togglePlay()"><i class="fa-solid fa-play"></i></button>
-            <button class="ctrl-btn" onclick="playNext()"><i class="fa-solid fa-forward-step"></i></button>
-        </div>
     </div>
 
-    <div class="player-extras">
-         <div class="volume-control">
-            <i class="fa-solid fa-volume-high" id="vol-icon" onclick="toggleMute()"></i>
-            <input type="range" id="volume-bar" min="0" max="1" step="0.05" value="1" oninput="handleVolume(this.value)">
-        </div>
-        <button class="ctrl-btn icon-only" id="mode-btn" onclick="toggleMode()"><i class="fa-solid fa-repeat"></i></button>
-        <button class="ctrl-btn icon-only" onclick="toggleQueue()"><i class="fa-solid fa-list"></i></button>
-    </div>
-    
-    <div class="mini-progress-track" onclick="event.stopPropagation()">
-        <input type="range" id="seek-bar" value="0" min="0" step="0.1" oninput="handleSeek(this.value)">
-    </div>
-</footer>
-
-<div id="modal-more-options" class="modal hidden">
-    <div class="modal-overlay" onclick="closeModal()"></div>
-    <div class="modal-content">
-        <h3>Options</h3>
-        <ul>
-            <li onclick="shareCurrentSong()"><i class="fa-solid fa-share-nodes"></i> Share Song</li>
-            <li onclick="openAddToPlaylistModalFromOptions()"><i class="fa-solid fa-plus"></i> Add to Playlist</li>
-        </ul>
-        <button class="btn-secondary" onclick="closeModal()">Cancel</button>
-    </div>
-</div>
-
-<div id="modal-add-to-playlist" class="modal hidden">
-    <div class="modal-overlay" onclick="closeModal()"></div>
-    <div class="modal-content">
-        <h3>Add to Playlist</h3>
-        <ul id="modal-playlist-list"></ul>
-        <button class="btn-secondary" onclick="closeModal()">Cancel</button>
-    </div>
-</div>
-
-<script src="app.js"></script>
-
+    <script src="app.js"></script>
 </body>
 </html>
