@@ -69,11 +69,19 @@ async function handleFiles(files) {
 if (!files.length) return;
 for (let file of files) {
 const id = 's_' + Date.now() + Math.random().toString(36).substr(2);
-let song = { id, file, title: file.name.replace(/\.[^/.]+$/, ""), artist: 'Unknown Artist', album: 'Unknown Album', duration: 0 };
+let song = { id, file, title: file.name.replace(/\.[^/.]+$/, ""), artist: 'Unknown Artist', album: 'Unknown Album', duration: 0, cover: null };
 if (window.jsmediatags) {
 try { await new Promise(r => { window.jsmediatags.read(file, { onSuccess: t => {
 if(t.tags.title) song.title = t.tags.title;
 if(t.tags.artist) song.artist = t.tags.artist;
+if(t.tags.album) song.album = t.tags.album;
+if(t.tags.picture) {
+    const data = t.tags.picture.data;
+    const format = t.tags.picture.format;
+    let base64String = "";
+    for (let i = 0; i < data.length; i++) { base64String += String.fromCharCode(data[i]); }
+    song.cover = `data:${format};base64,${window.btoa(base64String)}`;
+}
 r();
 }, onError: r }); }); } catch(e){}
 }
@@ -117,6 +125,10 @@ document.getElementById('current-artist').innerText = song.artist;
 document.getElementById('fp-title').innerText = song.title;
 document.getElementById('fp-artist').innerText = song.artist;
 
+// Update cover art
+const coverUrl = song.cover || 'logo.png'; // Use logo as default if no cover
+document.getElementById('current-cover').style.backgroundImage = `url('${coverUrl}')`;
+document.getElementById('fp-cover').style.backgroundImage = `url('${coverUrl}')`;
 }
 function playNext() {
 if (!state.currentPlaylist.length) return;
@@ -160,7 +172,7 @@ function handleSeek(val) { audio.currentTime = val; }
 function handleVolume(val) {
 audio.volume = val;
 document.getElementById('volume-bar').value = val;
-document.getElementById('volume-bar-fs').value = val;
+// document.getElementById('volume-bar-fs').value = val; // FS volume bar hidden
 }
 function toggleMute() {
 const v = audio.volume > 0 ? 0 : 1;
@@ -193,7 +205,7 @@ list.forEach((s, i) => {
 const div = document.createElement('div');
 div.className = 'song-item' + (state.allSongs[state.currentSongIndex]?.id === s.id ? ' active' : '');
 // Updated HTML structure to match new CSS grid
-div.innerHTML =  `<div class="col-index">${state.allSongs[state.currentSongIndex]?.id === s.id ? '<i class="fa-solid fa-play"></i>' : i+1}</div> <div class="col-title">${s.title}</div> <div class="col-artist">${s.artist}</div> <div class="col-album">${s.album}</div> <div class="col-time"></div> <div class="col-actions"> <button onclick="openAddToPlaylistModal('${s.id}')"><i class="fa-solid fa-plus"></i></button> <button onclick="removeSong('${s.id}')"><i class="fa-solid fa-trash"></i></button> </div>`;
+div.innerHTML =  `<div class="col-index">${state.allSongs[state.currentSongIndex]?.id === s.id ? '<i class="fa-solid fa-play"></i>' : i+1}</div> <div class="col-title">${s.title}</div> <div class="col-artist">${s.artist}</div> <div class="col-album">${s.album}</div> <div class="col-time"></div> <div class="col-actions"> <button onclick="openMoreOptionsModal('${s.id}')"><i class="fa-solid fa-ellipsis"></i></button> </div>`;
 div.ondblclick = () => playSongById(s.id);
     if(state.currentView!=='all-songs' && state.currentView!=='recent') {
         div.draggable = true;
@@ -258,16 +270,21 @@ state.currentPlaylist.splice(i, 0, item);
 if(state.currentSongIndex === from) state.currentSongIndex = i;
 renderQueue();
 };
-div.innerHTML = `<div class="q-info-box"><div class="q-title">${s.title}</div><div class="q-artist" style="font-size:11px;color:#888;">${s.artist}</div></div><div class="queue-drag-handle"><i class="fa-solid fa-bars"></i></div>`;
+div.innerHTML = `<div class="q-info-box"><div class="q-title">${s.title}</div><div class="q-artist">${s.artist}</div></div><div class="queue-drag-handle"><i class="fa-solid fa-bars"></i></div>`;
 div.onclick = e => { if(!e.target.closest('.queue-drag-handle')) { state.currentSongIndex=i; loadAndPlay(s); } };
 el.appendChild(div);
 });
 }
 // Modals
 let songToAddId = null;
-function openAddToPlaylistModal(id) {
+function openMoreOptionsModal(id) {
 if(!id) return;
 songToAddId = id;
+document.getElementById('modal-more-options').classList.remove('hidden');
+}
+
+function openAddToPlaylistModalFromOptions() {
+closeModal();
 document.getElementById('modal-add-to-playlist').classList.remove('hidden');
 const ul = document.getElementById('modal-playlist-list'); ul.innerHTML = '';
 state.playlists.forEach(p => {
@@ -276,4 +293,32 @@ li.onclick = () => { p.songIds.push(songToAddId); savePlaylists(); closeModal();
 ul.appendChild(li);
 });
 }
-function closeModal() { document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden')); }
+
+async function shareCurrentSong() {
+closeModal();
+const song = state.allSongs.find(s => s.id === songToAddId);
+if (!song || !song.file) {
+alert("Cannot share this song.");
+return;
+}
+
+if (navigator.share) {
+try {
+ await navigator.share({
+    title: song.title,
+    text: `Check out this song: ${song.title} by ${song.artist}`,
+    files: [new File([song.file], `${song.title}.mp3`, { type: song.file.type })]
+ });
+} catch (error) {
+ console.error('Error sharing:', error);
+ // Fallback for browsers that don't support file sharing directly
+ alert(`Sharing failed or not supported for files on this browser.\n\nYou can download the song named "${song.title}" from your library.`);
+}
+} else {
+alert("Web Share API is not supported in this browser.");
+}
+}
+
+function closeModal() {
+document.querySelectorAll('.modal, .queue-modal').forEach(m => m.classList.add('hidden'));
+}
