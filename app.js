@@ -55,7 +55,23 @@ audio.addEventListener('loadedmetadata', () => {
     document.getElementById('seek-bar-fs').max = audio.duration;
 });
 
+// 初始化封面为Logo
+resetCoverToLogo();
 });
+
+// ================= Helpers =================
+function resetCoverToLogo() {
+const logoUrl = 'logo.png';
+const miniCover = document.getElementById('current-cover');
+const fsCover = document.getElementById('fp-cover');
+
+// 关键修复：设置背景图同时清空内容，防止图标重叠
+miniCover.style.backgroundImage = `url('${logoUrl}')`;
+miniCover.innerHTML = ''; 
+fsCover.style.backgroundImage = `url('${logoUrl}')`;
+fsCover.innerHTML = '';
+}
+
 // ================= Full Screen Player Logic =================
 function openFullScreen(e) {
 if (e && (e.target.closest('button') || e.target.closest('input'))) return;
@@ -105,8 +121,8 @@ audio.play().then(() => { state.isPlaying = true; updatePlayBtns(); }).catch(() 
 updatePlayerBar(song);
 renderSongList(); 
 
+// 修复：如果队列窗口开着，实时刷新
 if (!document.getElementById('full-queue-modal').classList.contains('hidden')) renderQueue();
-
 }
 function togglePlay() {
 if (!audio.src) { if (state.allSongs.length) playSongById(state.allSongs[0].id); return; }
@@ -125,10 +141,15 @@ document.getElementById('current-artist').innerText = song.artist;
 document.getElementById('fp-title').innerText = song.title;
 document.getElementById('fp-artist').innerText = song.artist;
 
-// Update cover art
-const coverUrl = song.cover || 'logo.png'; // Use logo as default if no cover
-document.getElementById('current-cover').style.backgroundImage = `url('${coverUrl}')`;
-document.getElementById('fp-cover').style.backgroundImage = `url('${coverUrl}')`;
+// 关键修复：如果有封面用封面，没有用Logo，并且清空innerHTML防止重叠
+const coverUrl = song.cover || 'logo.png';
+const miniCover = document.getElementById('current-cover');
+const fsCover = document.getElementById('fp-cover');
+
+miniCover.style.backgroundImage = `url('${coverUrl}')`;
+miniCover.innerHTML = ''; // 清空可能存在的图标
+fsCover.style.backgroundImage = `url('${coverUrl}')`;
+fsCover.innerHTML = ''; // 清空可能存在的图标
 }
 function playNext() {
 if (!state.currentPlaylist.length) return;
@@ -172,7 +193,6 @@ function handleSeek(val) { audio.currentTime = val; }
 function handleVolume(val) {
 audio.volume = val;
 document.getElementById('volume-bar').value = val;
-// document.getElementById('volume-bar-fs').value = val; // FS volume bar hidden
 }
 function toggleMute() {
 const v = audio.volume > 0 ? 0 : 1;
@@ -204,7 +224,6 @@ el.innerHTML = '';
 list.forEach((s, i) => {
 const div = document.createElement('div');
 div.className = 'song-item' + (state.allSongs[state.currentSongIndex]?.id === s.id ? ' active' : '');
-// Updated HTML structure to match new CSS grid
 div.innerHTML =  `<div class="col-index">${state.allSongs[state.currentSongIndex]?.id === s.id ? '<i class="fa-solid fa-play"></i>' : i+1}</div> <div class="col-title">${s.title}</div> <div class="col-artist">${s.artist}</div> <div class="col-album">${s.album}</div> <div class="col-time"></div> <div class="col-actions"> <button onclick="openMoreOptionsModal('${s.id}')"><i class="fa-solid fa-ellipsis"></i></button> </div>`;
 div.ondblclick = () => playSongById(s.id);
     if(state.currentView!=='all-songs' && state.currentView!=='recent') {
@@ -311,7 +330,6 @@ try {
  });
 } catch (error) {
  console.error('Error sharing:', error);
- // Fallback for browsers that don't support file sharing directly
  alert(`Sharing failed or not supported for files on this browser.\n\nYou can download the song named "${song.title}" from your library.`);
 }
 } else {
