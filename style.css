@@ -1,145 +1,171 @@
-/* === 全局基础 (部分保持) === */
-:root {
-    --bg-color: #ffffff;
-    --sidebar-bg: #f9f9f9;
-    --text-primary: #1d1d1f;
-    --text-secondary: #86868b;
-    --accent-color: #fa2d48;
-    --accent-hover: #d6233c;
-    --border-color: #e5e5e5;
-    --player-height: 90px;
-    --sidebar-width: 260px;
-    --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-}
-* { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
-body { font-family: var(--font-family); color: var(--text-primary); background-color: var(--bg-color); overflow: hidden; height: 100vh; font-size: 14px; }
-.app-container { display: flex; height: calc(100vh - var(--player-height)); width: 100%; }
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Web Music Player</title>
+    <!-- Favicon: Geometric S (Base64 Embedded) -->
+    <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAMAAACdt4HsAAAABlBMVEUAAAAAAAAsHQTZAAAAAXRSTlMAQObYZgAAAFBJREFUeN7t0sENACAIA0Dwf+k0Jm4tKXA9A6R9F2g7s892dwEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAYH/gT00GQABp6CjWAAAAABJRU5ErkJggg==">
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
+</head>
+<body>
 
-/* Sidebar */
-.sidebar { width: var(--sidebar-width); background: var(--sidebar-bg); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; padding: 20px 0; flex-shrink: 0; }
-.sidebar-header { padding: 0 20px 20px; font-size: 20px; font-weight: 600; display: flex; align-items: center; gap: 8px; color: var(--accent-color); }
-.menu-group { margin-bottom: 24px; }
-.menu-label, .menu-label-row { padding: 0 20px 8px; font-size: 12px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; }
-.menu-item { padding: 10px 20px; cursor: pointer; display: flex; align-items: center; gap: 12px; color: var(--text-primary); }
-.menu-item:hover { background: rgba(0,0,0,0.05); }
-.menu-item.active { background: #e8e8ed; color: var(--accent-color); font-weight: 500; }
-.delete-playlist-btn { margin-left: auto; opacity: 0; transition: opacity 0.2s; }
-.menu-item:hover .delete-playlist-btn { opacity: 1; }
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <!-- Logo: Geometric S (Base64 Embedded) -->
+                <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAMAAACdt4HsAAAABlBMVEUAAAAAAAAsHQTZAAAAAXRSTlMAQObYZgAAAFBJREFUeN7t0sENACAIA0Dwf+k0Jm4tKXA9A6R9F2g7s892dwEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAYH/gT00GQABp6CjWAAAAABJRU5ErkJggg==" alt="Logo" class="app-logo">
+                <span>MUSIC</span>
+            </div>
+            <div class="menu-group">
+                <div class="menu-label">资料库</div>
+                <ul>
+                    <li class="menu-item active" data-view="all-songs" onclick="switchView('all-songs')">
+                        <i class="fa-solid fa-music"></i> 全部歌曲
+                    </li>
+                    <li class="menu-item" data-view="recent" onclick="switchView('recent')">
+                        <i class="fa-solid fa-clock-rotate-left"></i> 最近播放
+                    </li>
+                </ul>
+            </div>
+            <div class="menu-group">
+                <div class="menu-label-row">
+                    <span class="menu-label">播放列表</span>
+                    <button class="icon-btn-small" onclick="createPlaylist()"><i class="fa-solid fa-plus"></i></button>
+                </div>
+                <ul id="playlist-container"></ul>
+            </div>
+        </aside>
 
-/* Main Content */
-.main-content { flex: 1; display: flex; flex-direction: column; background: var(--bg-color); overflow: hidden; }
-.top-bar { height: 60px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 30px; flex-shrink: 0; }
-.search-box { background: #f0f0f0; border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; width: 300px; gap: 8px; color: var(--text-secondary); }
-.search-box input { border: none; background: transparent; outline: none; width: 100%; }
-.btn-primary { background: var(--accent-color); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 6px; }
-.icon-btn-small { background: none; border: none; cursor: pointer; color: var(--text-secondary); }
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="search-input" placeholder="SEARCH..." oninput="handleSearch(this.value)">
+                </div>
+                <div class="actions">
+                    <input type="file" id="file-upload" multiple accept=".mp3, .m4a, .wav, .flac, .ogg, audio/*" style="display: none;" onchange="handleFiles(this.files)">
+                    <button class="btn-primary" onclick="document.getElementById('file-upload').click()">
+                        <i class="fa-solid fa-upload"></i> IMPORT
+                    </button>
+                </div>
+            </header>
+            <div class="content-view">
+                <div class="view-header">
+                    <h1 id="view-title">全部歌曲</h1>
+                    <span id="song-count">0 首歌</span>
+                </div>
+                <div class="song-table-header">
+                    <div class="col-index">#</div>
+                    <div class="col-title sortable" onclick="sortSongs('title')">标题</div>
+                    <div class="col-artist sortable" onclick="sortSongs('artist')">艺人</div>
+                    <div class="col-album">专辑</div>
+                    <div class="col-time sortable" onclick="sortSongs('duration')">时长</div>
+                    <div class="col-actions">操作</div>
+                </div>
+                <div id="song-list" class="song-list-container"></div>
+            </div>
+        </main>
+    </div>
 
-/* Song List */
-.content-view { flex: 1; overflow-y: auto; padding: 20px 30px; }
-.view-header { margin-bottom: 20px; display: flex; align-items: baseline; gap: 12px; }
-.view-header h1 { font-size: 32px; font-weight: 700; }
-.song-table-header { display: grid; grid-template-columns: 50px 4fr 3fr 3fr 80px 50px; padding: 10px; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-weight: 600; }
-.song-item { display: grid; grid-template-columns: 50px 4fr 3fr 3fr 80px 50px; padding: 12px 10px; border-bottom: 1px solid #f5f5f5; align-items: center; border-radius: 6px; }
-.song-item:hover { background: #f2f2f2; }
-.song-item.active { color: var(--accent-color); background: #fff2f4; }
-.col-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.col-artist, .col-album { color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.col-actions button { background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 4px; }
+    <!-- 全屏播放器 (Full Screen Player) -->
+    <div id="full-player-modal" class="full-player-modal hidden">
+        <div class="capsule-btn" onclick="closeFullScreen()">CLOSE</div>
+        
+        <div class="fp-content">
+            <div class="fp-cover-container">
+                <div class="fp-cover" id="fp-cover">
+                    <i class="fa-solid fa-music"></i>
+                </div>
+            </div>
 
-/* === Mini Player Bar (底部播放条) === */
-.player-bar {
-    height: var(--player-height); background: rgba(255,255,255,0.95);
-    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-    border-top: 1px solid var(--border-color); position: fixed; bottom: 0; width: 100%;
-    display: flex; align-items: center; padding: 0 30px; justify-content: space-between; z-index: 100;
-    cursor: pointer; /* 暗示可点击 */
-    transition: background 0.2s;
-}
-.player-bar:hover { background: #f9f9f9; }
-.player-info { display: flex; align-items: center; width: 25%; gap: 12px; }
-.cover-art { width: 48px; height: 48px; background: #e0e0e0; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #999; }
-.track-details { display: flex; flex-direction: column; overflow: hidden; }
-.player-controls-container { flex: 1; display: flex; flex-direction: column; align-items: center; max-width: 500px; }
-.control-buttons { display: flex; align-items: center; gap: 24px; margin-bottom: 6px; }
-.ctrl-btn { background: none; border: none; cursor: pointer; font-size: 20px; color: var(--text-primary); display: flex; align-items: center; }
-/* 防止底栏按钮触发全屏 */
-.player-bar button, .player-bar input { pointer-events: auto; } 
-.progress-section { width: 100%; display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--text-secondary); }
-.player-volume { width: 25%; display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
+            <div class="fp-info">
+                <div class="fp-text">
+                    <h2 id="fp-title">NOT PLAYING</h2>
+                    <p id="fp-artist">--</p>
+                </div>
+            </div>
 
-input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; cursor: pointer; }
-input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 12px; width: 12px; border-radius: 50%; background: #888; margin-top: -4px; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
-input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: #ddd; border-radius: 2px; }
+            <div class="fp-progress">
+                <input type="range" id="seek-bar-fs" value="0" min="0" step="0.1" oninput="handleSeek(this.value)">
+                <div class="fp-times">
+                    <span id="current-time-fs">0:00</span>
+                    <span id="total-duration-fs">0:00</span>
+                </div>
+            </div>
 
-/* === Full Screen Player (全屏界面) === */
-.full-player-modal {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: #fff; z-index: 200;
-    display: flex; flex-direction: column; align-items: center;
-    transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
-    transform: translateY(0);
-    padding: 20px;
-    overflow-y: auto;
-}
-.full-player-modal.hidden { transform: translateY(100%); }
+            <div class="fp-controls">
+                <button class="fp-btn-s" id="mode-btn-fs" onclick="toggleMode()"><i class="fa-solid fa-repeat"></i></button>
+                <div class="fp-main-ctrls">
+                    <button class="fp-btn-m" onclick="playPrev()"><i class="fa-solid fa-backward-step"></i></button>
+                    <button class="fp-btn-l" id="play-btn-fs" onclick="togglePlay()"><i class="fa-solid fa-play"></i></button>
+                    <button class="fp-btn-m" onclick="playNext()"><i class="fa-solid fa-forward-step"></i></button>
+                </div>
+                <button class="fp-btn-s" id="vol-btn-fs" onclick="toggleMute()"><i class="fa-solid fa-volume-high"></i></button>
+            </div>
+            
+            <div class="fp-volume-slider">
+                <i class="fa-solid fa-volume-low"></i>
+                <input type="range" id="volume-bar-fs" min="0" max="1" step="0.05" value="1" oninput="handleVolume(this.value)">
+                <i class="fa-solid fa-volume-high"></i>
+            </div>
 
-/* 顶部胶囊指示条 */
-.capsule { width: 40px; height: 5px; background: #e0e0e0; border-radius: 10px; margin-bottom: 20px; cursor: pointer; flex-shrink: 0; }
+            <div class="fp-footer">
+                <button onclick="toggleQueue()">QUEUE LIST</button>
+            </div>
+        </div>
+    </div>
 
-.fp-content { width: 100%; max-width: 400px; display: flex; flex-direction: column; align-items: center; flex: 1; justify-content: space-evenly; }
+    <!-- 播放队列弹窗 (Queue Modal) -->
+    <div id="full-queue-modal" class="queue-modal hidden">
+        <div class="queue-modal-header">
+            <h3>待播清单</h3>
+            <button class="btn-done" onclick="toggleQueue()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="queue-modal-content" id="queue-content-list"></div>
+    </div>
 
-/* 大封面 */
-.fp-cover-container { width: 100%; aspect-ratio: 1/1; margin-bottom: 30px; display: flex; justify-content: center; align-items: center; }
-.fp-cover {
-    width: 100%; height: 100%; background: #eee; border-radius: 12px;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.2);
-    display: flex; align-items: center; justify-content: center; font-size: 60px; color: #ccc;
-    background-size: cover; background-position: center;
-}
+    <!-- 底部迷你播放条 (Mini Player) -->
+    <footer class="player-bar" id="mini-player" onclick="openFullScreen(event)">
+        <div class="player-info">
+            <div class="cover-art" id="current-cover"><i class="fa-solid fa-music"></i></div>
+            <div class="track-details">
+                <div class="track-name" id="current-name">未播放</div>
+                <div class="track-artist" id="current-artist">--</div>
+            </div>
+        </div>
+        <div class="player-controls-container">
+            <div class="control-buttons">
+                <button class="ctrl-btn icon-only" id="mode-btn"><i class="fa-solid fa-repeat"></i></button>
+                <button class="ctrl-btn" onclick="playPrev()"><i class="fa-solid fa-backward-step"></i></button>
+                <button class="ctrl-btn play-pause-btn" id="play-pause-btn" onclick="togglePlay()"><i class="fa-solid fa-play"></i></button>
+                <button class="ctrl-btn" onclick="playNext()"><i class="fa-solid fa-forward-step"></i></button>
+                </div>
+            <div class="progress-section">
+                <span id="current-time">0:00</span>
+                <input type="range" id="seek-bar" value="0" min="0" step="0.1" oninput="handleSeek(this.value)">
+                <span id="total-duration">0:00</span>
+            </div>
+        </div>
+        <div class="player-volume">
+            <i class="fa-solid fa-volume-high" id="vol-icon" onclick="toggleMute()"></i>
+            <input type="range" id="volume-bar" min="0" max="1" step="0.05" value="1" oninput="handleVolume(this.value)">
+        </div>
+    </footer>
 
-/* 信息 */
-.fp-info { width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.fp-text { text-align: left; overflow: hidden; }
-.fp-text h2 { font-size: 22px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.fp-text p { font-size: 16px; color: var(--text-secondary); margin-top: 4px; }
-.fp-more-btn { background: none; border: none; font-size: 20px; color: var(--accent-color); cursor: pointer; width: 40px; height: 40px; background: #f2f2f2; border-radius: 50%; }
+    <!-- 添加到播放列表弹窗 -->
+    <div id="modal-add-to-playlist" class="modal hidden">
+        <div class="modal-content">
+            <h3>ADD TO PLAYLIST</h3>
+            <ul id="modal-playlist-list"></ul>
+            <button class="btn-secondary" onclick="closeModal()">CANCEL</button>
+        </div>
+    </div>
 
-/* 全屏进度条 */
-.fp-progress { width: 100%; margin-bottom: 30px; }
-.fp-progress input { height: 6px; }
-.fp-progress input::-webkit-slider-thumb { height: 16px; width: 16px; margin-top: -5px; }
-.fp-times { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary); margin-top: 8px; font-weight: 500; }
+    <script src="app.js"></script>
+</body>
+</html>
 
-/* 全屏控制按钮 */
-.fp-controls { width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
-.fp-main-ctrls { display: flex; align-items: center; gap: 30px; }
-.fp-btn-s { background: none; border: none; font-size: 20px; color: var(--text-secondary); cursor: pointer; }
-.fp-btn-s.active { color: var(--accent-color); }
-.fp-btn-m { background: none; border: none; font-size: 36px; color: var(--text-primary); cursor: pointer; }
-.fp-btn-l { background: none; border: none; font-size: 56px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 80px; height: 80px; }
-
-/* 全屏音量条 */
-.fp-volume-slider { width: 100%; display: flex; align-items: center; gap: 15px; color: var(--text-secondary); margin-bottom: 20px; }
-.fp-footer { margin-top: auto; padding-bottom: 20px; }
-.fp-footer button { background: none; border: none; font-size: 20px; color: var(--text-secondary); cursor: pointer; }
-
-/* 队列弹窗 (Styles from previous step, slightly adjusted) */
-.queue-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 300; display: flex; flex-direction: column; transition: transform 0.3s ease; transform: translateY(0); }
-.queue-modal.hidden { transform: translateY(100%); }
-.queue-modal-header { height: 60px; padding: 0 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; background: rgba(255,255,255,0.95); }
-.btn-done { background: none; border: none; font-size: 16px; color: var(--accent-color); font-weight: 600; cursor: pointer; }
-.queue-modal-content { flex: 1; overflow-y: auto; padding: 20px; }
-.queue-list-item { display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid #eee; }
-.queue-list-item.active .q-title { color: var(--accent-color); }
-.q-info-box { flex: 1; margin-left: 10px; }
-.q-title { font-size: 16px; font-weight: 500; }
-.q-artist { font-size: 13px; color: #888; }
-.queue-drag-handle { padding: 10px; color: #ccc; cursor: grab; }
-
-/* Mobile */
-@media (max-width: 768px) {
-    .sidebar { display: none; }
-    .player-volume { display: none; } /* mini player volume hidden on mobile */
-    .song-table-header, .song-item { grid-template-columns: 40px 1fr 1fr 40px; }
-    .col-album, .col-time { display: none; }
-}
