@@ -61,7 +61,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 });
 
-// ================= Full Screen Player Logic (新增) =================
+// ================= Full Screen Player Logic =================
 
 function openFullScreen(e) {
     // 如果点击的是底栏里的按钮或滑块，不要打开全屏
@@ -135,8 +135,6 @@ function updatePlayerBar(song) {
     // Update Full Screen Player
     document.getElementById('fp-title').innerText = song.title;
     document.getElementById('fp-artist').innerText = song.artist;
-    
-    // 这里没做封面提取，用占位符。若有封面数据需在这里更新 img src
 }
 
 function playNext() {
@@ -209,6 +207,8 @@ function getCurrentViewSongs() {
     const k = document.getElementById('search-input').value.toLowerCase();
     return k ? list.filter(s=>s.title.toLowerCase().includes(k)||s.artist.toLowerCase().includes(k)) : list;
 }
+
+function handleSearch(val) { renderSongList(); }
 
 function renderSongList() {
     const list = getCurrentViewSongs();
@@ -297,3 +297,4 @@ function openAddToPlaylistModal(id) {
     });
 }
 function closeModal() { document.querySelector('.modal').classList.add('hidden'); }
+
