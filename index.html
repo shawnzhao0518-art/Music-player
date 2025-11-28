@@ -4,8 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Web Music Player</title>
-    <!-- Favicon: Geometric S (Base64 Embedded) -->
-    <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAMAAACdt4HsAAAABlBMVEUAAAAAAAAsHQTZAAAAAXRSTlMAQObYZgAAAFBJREFUeN7t0sENACAIA0Dwf+k0Jm4tKXA9A6R9F2g7s892dwEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAYH/gT00GQABp6CjWAAAAABJRU5ErkJggg==">
+    <link rel="icon" type="image/png" href="logo.png">
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
@@ -16,8 +15,7 @@
     <div class="app-container">
         <aside class="sidebar">
             <div class="sidebar-header">
-                <!-- Logo: Geometric S (Base64 Embedded) -->
-                <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAMAAACdt4HsAAAABlBMVEUAAAAAAAAsHQTZAAAAAXRSTlMAQObYZgAAAFBJREFUeN7t0sENACAIA0Dwf+k0Jm4tKXA9A6R9F2g7s892dwEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAYH/gT00GQABp6CjWAAAAABJRU5ErkJggg==" alt="Logo" class="app-logo">
+                <img src="logo.png" alt="Logo" class="app-logo">
                 <span>MUSIC</span>
             </div>
             <div class="menu-group">
@@ -53,6 +51,7 @@
                     </button>
                 </div>
             </header>
+
             <div class="content-view">
                 <div class="view-header">
                     <h1 id="view-title">全部歌曲</h1>
@@ -71,7 +70,6 @@
         </main>
     </div>
 
-    <!-- 全屏播放器 (Full Screen Player) -->
     <div id="full-player-modal" class="full-player-modal hidden">
         <div class="capsule-btn" onclick="closeFullScreen()">CLOSE</div>
         
@@ -119,7 +117,6 @@
         </div>
     </div>
 
-    <!-- 播放队列弹窗 (Queue Modal) -->
     <div id="full-queue-modal" class="queue-modal hidden">
         <div class="queue-modal-header">
             <h3>待播清单</h3>
@@ -128,7 +125,6 @@
         <div class="queue-modal-content" id="queue-content-list"></div>
     </div>
 
-    <!-- 底部迷你播放条 (Mini Player) -->
     <footer class="player-bar" id="mini-player" onclick="openFullScreen(event)">
         <div class="player-info">
             <div class="cover-art" id="current-cover"><i class="fa-solid fa-music"></i></div>
@@ -156,7 +152,6 @@
         </div>
     </footer>
 
-    <!-- 添加到播放列表弹窗 -->
     <div id="modal-add-to-playlist" class="modal hidden">
         <div class="modal-content">
             <h3>ADD TO PLAYLIST</h3>
@@ -168,4 +163,3 @@
     <script src="app.js"></script>
 </body>
 </html>
-
