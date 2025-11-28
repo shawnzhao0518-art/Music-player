@@ -1,342 +1,359 @@
-/* app.js */
-// ================= Data & DB =================
-const dbName = "WebMusicPlayerDB";
-const storeName = "songs";
-let db;
-const MusicDB = {
-init: () => new Promise((resolve, reject) => {
-const r = indexedDB.open(dbName, 1);
-r.onupgradeneeded = e => {
-db = e.target.result;
-if (!db.objectStoreNames.contains(storeName)) db.createObjectStore(storeName, { keyPath: "id" });
-};
-r.onsuccess = e => { db = e.target.result; resolve(db); };
-r.onerror = e => reject(e);
-}),
-addSong: song => new Promise((resolve, reject) => {
-const tx = db.transaction([storeName], "readwrite");
-tx.objectStore(storeName).add(song).onsuccess = () => resolve(song);
-}),
-getAllSongs: () => new Promise((resolve) => {
-const tx = db.transaction([storeName], "readonly");
-tx.objectStore(storeName).getAll().onsuccess = e => resolve(e.target.result);
-}),
-deleteSong: id => new Promise((resolve) => {
-const tx = db.transaction([storeName], "readwrite");
-tx.objectStore(storeName).delete(id).onsuccess = () => resolve();
-}),
-clearAll: () => {
-const tx = db.transaction([storeName], "readwrite");
-tx.objectStore(storeName).clear();
-}
-};
-const state = {
-allSongs: [], playlists: [{ id: 'fav', name: 'Favorites', songIds: [] }], history: [],
-currentView: 'all-songs', currentPlaylist: [], currentSongIndex: -1,
-isPlaying: false, mode: 'sequence', volume: 1,
-dragStartIndex: null, queueDragStartIndex: null
-};
-const audio = new Audio();
-document.addEventListener('DOMContentLoaded', async () => {
-await MusicDB.init();
-const saved = await MusicDB.getAllSongs();
-if (saved && saved.length) state.allSongs = saved;
-loadPlaylists();
-renderSidebar();
-renderSongList();
-audio.addEventListener('timeupdate', updateProgress);
-audio.addEventListener('ended', handleSongEnd);
-audio.addEventListener('loadedmetadata', () => {
-    const dur = formatTime(audio.duration);
-    document.getElementById('total-duration').innerText = dur;
-    document.getElementById('seek-bar').max = audio.duration;
-    // Sync FS
-    document.getElementById('total-duration-fs').innerText = dur;
-    document.getElementById('seek-bar-fs').max = audio.duration;
-});
+// 状态管理
+let songs = [];
+let currentSongIndex = -1;
+let isPlaying = false;
+let audio = new Audio();
 
-// 初始化封面为Logo
-resetCoverToLogo();
-});
+// 批量模式状态
+let isBatchMode = false;
+let selectedSongIds = new Set(); // 存储被选中的歌曲索引
 
-// ================= Helpers =================
-function resetCoverToLogo() {
-const logoUrl = 'logo.png';
-const miniCover = document.getElementById('current-cover');
-const fsCover = document.getElementById('fp-cover');
+// DOM 元素引用
+const songListEl = document.getElementById('song-list');
+const playPauseBtn = document.getElementById('play-pause-btn');
+const prevBtn = document.getElementById('prev-btn');
+const nextBtn = document.getElementById('next-btn');
+const progressBar = document.getElementById('progress-bar');
+const currentTimeEl = document.getElementById('current-time');
+const totalDurationEl = document.getElementById('total-duration');
+const volumeSlider = document.getElementById('volume-slider');
+const fileInput = document.getElementById('file-input');
+const importBtn = document.getElementById('import-btn');
 
-// 关键修复：设置背景图同时清空内容，防止图标重叠
-miniCover.style.backgroundImage = `url('${logoUrl}')`;
-miniCover.innerHTML = ''; 
-fsCover.style.backgroundImage = `url('${logoUrl}')`;
-fsCover.innerHTML = '';
+// 批量相关 DOM
+const batchBtn = document.getElementById('batch-btn');
+const batchActionBar = document.getElementById('batch-action-bar');
+const selectedCountEl = document.getElementById('selected-count');
+const batchDeleteBtn = document.getElementById('batch-delete');
+const batchCancelBtn = document.getElementById('batch-cancel');
+const batchExportBtn = document.getElementById('batch-export');
+const batchAddPlaylistBtn = document.getElementById('batch-add-playlist');
+
+// 初始化
+function init() {
+    // 绑定事件
+    importBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', handleFileImport);
+    
+    playPauseBtn.addEventListener('click', togglePlay);
+    prevBtn.addEventListener('click', playPrev);
+    nextBtn.addEventListener('click', playNext);
+    
+    // 修复：进度条拖动
+    progressBar.addEventListener('input', (e) => {
+        const seekTime = (audio.duration / 100) * e.target.value;
+        audio.currentTime = seekTime;
+    });
+
+    volumeSlider.addEventListener('input', (e) => {
+        audio.volume = e.target.value;
+    });
+
+    // 关键修复：音频时间更新与元数据加载
+    audio.addEventListener('timeupdate', updateProgress);
+    audio.addEventListener('loadedmetadata', () => {
+        totalDurationEl.innerText = formatTime(audio.duration);
+    });
+    audio.addEventListener('ended', playNext); // 自动播放下一首
+
+    // 批量模式事件绑定
+    batchBtn.addEventListener('click', toggleBatchMode);
+    batchCancelBtn.addEventListener('click', toggleBatchMode);
+    batchDeleteBtn.addEventListener('click', batchDeleteSongs);
+    batchExportBtn.addEventListener('click', batchExportSongs);
+    batchAddPlaylistBtn.addEventListener('click', () => alert("添加到歌单功能待开发（需完善歌单逻辑）"));
+
+    // 点击其他地方关闭上下文菜单
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.more-btn') && !e.target.closest('.context-menu')) {
+            closeAllContextMenus();
+        }
+    });
 }
 
-// ================= Full Screen Player Logic =================
-function openFullScreen(e) {
-if (e && (e.target.closest('button') || e.target.closest('input'))) return;
-document.getElementById('full-player-modal').classList.remove('hidden');
+// 格式化时间 (秒 -> mm:ss)
+function formatTime(seconds) {
+    if (isNaN(seconds)) return "0:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 }
-function closeFullScreen() {
-document.getElementById('full-player-modal').classList.add('hidden');
-}
-// ================= Playback Logic =================
-async function handleFiles(files) {
-if (!files.length) return;
-for (let file of files) {
-const id = 's_' + Date.now() + Math.random().toString(36).substr(2);
-let song = { id, file, title: file.name.replace(/\.[^/.]+$/, ""), artist: 'Unknown Artist', album: 'Unknown Album', duration: 0, cover: null };
-if (window.jsmediatags) {
-try { await new Promise(r => { window.jsmediatags.read(file, { onSuccess: t => {
-if(t.tags.title) song.title = t.tags.title;
-if(t.tags.artist) song.artist = t.tags.artist;
-if(t.tags.album) song.album = t.tags.album;
-if(t.tags.picture) {
-    const data = t.tags.picture.data;
-    const format = t.tags.picture.format;
-    let base64String = "";
-    for (let i = 0; i < data.length; i++) { base64String += String.fromCharCode(data[i]); }
-    song.cover = `data:${format};base64,${window.btoa(base64String)}`;
-}
-r();
-}, onError: r }); }); } catch(e){}
-}
-state.allSongs.push(song);
-MusicDB.addSong(song);
-}
-if (state.currentView === 'all-songs') renderSongList();
-}
-function playSongById(id) {
-const s = state.allSongs.find(x => x.id === id);
-if (!s) return;
-state.currentPlaylist = getCurrentViewSongs();
-state.currentSongIndex = state.currentPlaylist.findIndex(x => x.id === id);
-loadAndPlay(s);
-}
-function loadAndPlay(song) {
-if (!song.file) return alert("File missing");
-if (audio.src && audio.src.startsWith('blob:')) URL.revokeObjectURL(audio.src);
-audio.src = URL.createObjectURL(song.file);
-audio.play().then(() => { state.isPlaying = true; updatePlayBtns(); }).catch(() => { state.isPlaying = false; updatePlayBtns(); });
-updatePlayerBar(song);
-renderSongList(); 
 
-// 修复：如果队列窗口开着，实时刷新
-if (!document.getElementById('full-queue-modal').classList.contains('hidden')) renderQueue();
-}
-function togglePlay() {
-if (!audio.src) { if (state.allSongs.length) playSongById(state.allSongs[0].id); return; }
-state.isPlaying ? audio.pause() : audio.play();
-state.isPlaying = !state.isPlaying;
-updatePlayBtns();
-}
-function updatePlayBtns() {
-const icon = state.isPlaying ? '<i class="fa-solid fa-pause"></i>' : '<i class="fa-solid fa-play"></i>';
-document.getElementById('play-pause-btn').innerHTML = icon;
-document.getElementById('play-btn-fs').innerHTML = icon;
-}
-function updatePlayerBar(song) {
-document.getElementById('current-name').innerText = song.title;
-document.getElementById('current-artist').innerText = song.artist;
-document.getElementById('fp-title').innerText = song.title;
-document.getElementById('fp-artist').innerText = song.artist;
-
-// 关键修复：如果有封面用封面，没有用Logo，并且清空innerHTML防止重叠
-const coverUrl = song.cover || 'logo.png';
-const miniCover = document.getElementById('current-cover');
-const fsCover = document.getElementById('fp-cover');
-
-miniCover.style.backgroundImage = `url('${coverUrl}')`;
-miniCover.innerHTML = ''; // 清空可能存在的图标
-fsCover.style.backgroundImage = `url('${coverUrl}')`;
-fsCover.innerHTML = ''; // 清空可能存在的图标
-}
-function playNext() {
-if (!state.currentPlaylist.length) return;
-let idx = state.mode === 'shuffle' ? Math.floor(Math.random()*state.currentPlaylist.length) : state.currentSongIndex + 1;
-if (idx >= state.currentPlaylist.length) idx = 0;
-state.currentSongIndex = idx;
-loadAndPlay(state.currentPlaylist[idx]);
-}
-function playPrev() {
-if (!state.currentPlaylist.length) return;
-if (audio.currentTime > 3) { audio.currentTime = 0; return; }
-let idx = state.currentSongIndex - 1;
-if (idx < 0) idx = state.currentPlaylist.length - 1;
-state.currentSongIndex = idx;
-loadAndPlay(state.currentPlaylist[idx]);
-}
-function handleSongEnd() { state.mode === 'one' ? (audio.currentTime=0, audio.play()) : playNext(); }
-function toggleMode() {
-const m = ['sequence', 'shuffle', 'one'];
-state.mode = m[(m.indexOf(state.mode)+1)%3];
-const icon = state.mode === 'sequence' ? 'fa-repeat' : (state.mode === 'shuffle' ? 'fa-shuffle' : 'fa-1');
-const html = `<i class="fa-solid ${icon}"></i>`;
-const btnMini = document.getElementById('mode-btn');
-const btnFs = document.getElementById('mode-btn-fs');
-btnMini.innerHTML = html; btnFs.innerHTML = html;
-
-if(state.mode !== 'sequence') { btnMini.classList.add('active'); btnFs.classList.add('active'); }
-else { btnMini.classList.remove('active'); btnFs.classList.remove('active'); }
-
-}
-// ================= UI Updates =================
+// 修复：更新进度条逻辑
 function updateProgress() {
-const cur = audio.currentTime;
-const timeStr = formatTime(cur);
-document.getElementById('seek-bar').value = cur;
-document.getElementById('current-time').innerText = timeStr;
-document.getElementById('seek-bar-fs').value = cur;
-document.getElementById('current-time-fs').innerText = timeStr;
-}
-function handleSeek(val) { audio.currentTime = val; }
-function handleVolume(val) {
-audio.volume = val;
-document.getElementById('volume-bar').value = val;
-}
-function toggleMute() {
-const v = audio.volume > 0 ? 0 : 1;
-handleVolume(v);
-}
-function formatTime(s) {
-if(isNaN(s)) return "0:00";
-const m=Math.floor(s/60), sec=Math.floor(s%60);
-return `${m}:${sec<10?'0':''}${sec}`;
-}
-// ================= Views & Lists =================
-function getCurrentViewSongs() {
-let list = state.currentView === 'all-songs' ? state.allSongs : (state.currentView === 'recent' ? state.history.map(id=>state.allSongs.find(x=>x.id===id)).filter(x=>x) : state.playlists.find(p=>p.id===state.currentView)?.songIds.map(id=>state.allSongs.find(x=>x.id===id)).filter(x=>x) || []);
-const k = document.getElementById('search-input').value.toLowerCase();
-return k ? list.filter(s=>s.title.toLowerCase().includes(k)||s.artist.toLowerCase().includes(k)) : list;
-}
-function handleSearch(val) { renderSongList(); }
-function sortSongs(key) {
-// Basic sort toggle for demonstration
-if(!state.sortAsc) state.sortAsc = true; else state.sortAsc = !state.sortAsc;
-state.allSongs.sort((a,b) => (a[key] > b[key] ? 1 : -1) * (state.sortAsc ? 1 : -1));
-renderSongList();
-}
-function renderSongList() {
-const list = getCurrentViewSongs();
-const el = document.getElementById('song-list');
-document.getElementById('song-count').innerText = list.length + ' songs';
-el.innerHTML = '';
-list.forEach((s, i) => {
-const div = document.createElement('div');
-div.className = 'song-item' + (state.allSongs[state.currentSongIndex]?.id === s.id ? ' active' : '');
-div.innerHTML =  `<div class="col-index">${state.allSongs[state.currentSongIndex]?.id === s.id ? '<i class="fa-solid fa-play"></i>' : i+1}</div> <div class="col-title">${s.title}</div> <div class="col-artist">${s.artist}</div> <div class="col-album">${s.album}</div> <div class="col-time"></div> <div class="col-actions"> <button onclick="openMoreOptionsModal('${s.id}')"><i class="fa-solid fa-ellipsis"></i></button> </div>`;
-div.ondblclick = () => playSongById(s.id);
-    if(state.currentView!=='all-songs' && state.currentView!=='recent') {
-        div.draggable = true;
-        div.ondragstart = e => { state.dragStartIndex = i; e.target.classList.add('dragging'); };
-        div.ondragover = e => e.preventDefault();
-        div.ondragdrop = e => { e.preventDefault(); };
+    if (audio.duration) {
+        const progressPercent = (audio.currentTime / audio.duration) * 100;
+        progressBar.value = progressPercent;
+        currentTimeEl.innerText = formatTime(audio.currentTime);
+        // 持续更新总时长以防加载延迟
+        if(totalDurationEl.innerText === "0:00") {
+             totalDurationEl.innerText = formatTime(audio.duration);
+        }
     }
-    el.appendChild(div);
-});
-
-}
-function switchView(id) {
-state.currentView = id;
-document.querySelectorAll('.menu-item').forEach(e => e.classList.remove('active'));
-// Select sidebar item
-const menuItem = document.querySelector(`[data-view="${id}"]`);
-if(menuItem) menuItem.classList.add('active');
-// Update header title
-const titles = { 'all-songs': 'All Songs', 'recent': 'Recently Played' };
-const plName = state.playlists.find(p => p.id === id)?.name;
-document.getElementById('view-title').innerText = titles[id] || plName || 'Library';
-
-renderSongList();
-
-}
-function createPlaylist() {
-const n = prompt("Playlist Name");
-if(n) { state.playlists.push({id:'pl_'+Date.now(), name:n, songIds:[]}); savePlaylists(); renderSidebar(); }
-}
-function renderSidebar() {
-const ul = document.getElementById('playlist-container'); ul.innerHTML = '';
-state.playlists.forEach(p => {
-const li = document.createElement('li'); li.className = 'menu-item' + (state.currentView===p.id?' active':'');
-li.innerHTML = `<i class="fa-solid fa-list-music"></i> ${p.name}`;
-li.onclick = () => switchView(p.id);
-ul.appendChild(li);
-});
-}
-function savePlaylists() { localStorage.setItem('playlists', JSON.stringify(state.playlists)); }
-function loadPlaylists() { const d = localStorage.getItem('playlists'); if(d) state.playlists = JSON.parse(d); }
-function removeSong(id) { if(confirm("Delete song?")) { state.allSongs=state.allSongs.filter(x=>x.id!==id); MusicDB.deleteSong(id); renderSongList(); } }
-// ================= Queue =================
-function toggleQueue() {
-const el = document.getElementById('full-queue-modal');
-el.classList.toggle('hidden');
-if(!el.classList.contains('hidden')) renderQueue();
-}
-function renderQueue() {
-const el = document.getElementById('queue-content-list'); el.innerHTML = '';
-state.currentPlaylist.forEach((s, i) => {
-const div = document.createElement('div');
-div.className = 'queue-list-item' + (i===state.currentSongIndex?' active':'');
-div.draggable = true;
-div.ondragstart = e => { state.queueDragStartIndex = i; e.dataTransfer.effectAllowed = 'move'; };
-div.ondragover = e => e.preventDefault();
-div.ondrop = e => {
-e.preventDefault();
-const from = state.queueDragStartIndex;
-if(from===null || from===i) return;
-const item = state.currentPlaylist.splice(from, 1)[0];
-state.currentPlaylist.splice(i, 0, item);
-if(state.currentSongIndex === from) state.currentSongIndex = i;
-renderQueue();
-};
-div.innerHTML = `<div class="q-info-box"><div class="q-title">${s.title}</div><div class="q-artist">${s.artist}</div></div><div class="queue-drag-handle"><i class="fa-solid fa-bars"></i></div>`;
-div.onclick = e => { if(!e.target.closest('.queue-drag-handle')) { state.currentSongIndex=i; loadAndPlay(s); } };
-el.appendChild(div);
-});
-}
-// Modals
-let songToAddId = null;
-function openMoreOptionsModal(id) {
-if(!id) return;
-songToAddId = id;
-document.getElementById('modal-more-options').classList.remove('hidden');
 }
 
-function openAddToPlaylistModalFromOptions() {
-closeModal();
-document.getElementById('modal-add-to-playlist').classList.remove('hidden');
-const ul = document.getElementById('modal-playlist-list'); ul.innerHTML = '';
-state.playlists.forEach(p => {
-const li = document.createElement('li'); li.innerText = p.name;
-li.onclick = () => { p.songIds.push(songToAddId); savePlaylists(); closeModal(); };
-ul.appendChild(li);
-});
+// 文件导入处理
+function handleFileImport(event) {
+    const files = Array.from(event.target.files);
+    
+    files.forEach(file => {
+        // 使用 jsmediatags 可以获取真实元数据，这里简化处理使用文件名
+        const song = {
+            id: Date.now() + Math.random(), // 唯一ID
+            title: file.name.replace(/\.[^/.]+$/, ""),
+            artist: "未知歌手",
+            album: "本地导入",
+            duration: "--:--", // 需异步获取
+            file: file,
+            url: URL.createObjectURL(file)
+        };
+        songs.push(song);
+    });
+
+    renderSongList();
+    
+    // 如果是首次导入，自动播放第一首（可选）
+    if (currentSongIndex === -1 && songs.length > 0) {
+        // loadSong(0); // 暂时不自动播放，等待用户点击
+    }
 }
 
-async function shareCurrentSong() {
-closeModal();
-const song = state.allSongs.find(s => s.id === songToAddId);
-if (!song || !song.file) {
-alert("Cannot share this song.");
-return;
+// 渲染歌曲列表
+function renderSongList() {
+    songListEl.innerHTML = '';
+    
+    songs.forEach((song, index) => {
+        const li = document.createElement('li');
+        li.className = `song-item ${index === currentSongIndex ? 'active' : ''}`;
+        
+        // 渲染 HTML 结构
+        li.innerHTML = `
+            <div class="song-checkbox-container">
+                <input type="checkbox" class="song-checkbox" data-index="${index}">
+            </div>
+            <div class="song-title">${song.title}</div>
+            <div class="song-artist">${song.artist}</div>
+            <div class="song-album">${song.album}</div>
+            <div class="song-duration">${song.duration}</div>
+            <div class="action-cell">
+                <button class="more-btn"><span class="material-icons">more_horiz</span></button>
+                <ul class="context-menu">
+                    <li onclick="alert('已添加到播放队列')">下一首播放</li>
+                    <li onclick="alert('添加到歌单逻辑')">添加到歌单</li>
+                    <li class="delete-option" data-delete-index="${index}">删除</li>
+                </ul>
+            </div>
+        `;
+
+        // 绑定点击播放逻辑（非批量模式下）
+        li.addEventListener('click', (e) => {
+            // 如果是复选框、更多按钮或菜单，不触发播放
+            if (e.target.closest('.song-checkbox') || e.target.closest('.action-cell')) return;
+            
+            if (isBatchMode) {
+                // 批量模式下点击行 = 切换勾选
+                const checkbox = li.querySelector('.song-checkbox');
+                checkbox.checked = !checkbox.checked;
+                handleCheckboxChange(index, checkbox.checked);
+            } else {
+                playSong(index);
+            }
+        });
+
+        // 绑定复选框事件
+        const checkbox = li.querySelector('.song-checkbox');
+        checkbox.addEventListener('change', (e) => {
+            handleCheckboxChange(index, e.target.checked);
+        });
+        
+        // 绑定更多菜单事件
+        const moreBtn = li.querySelector('.more-btn');
+        const contextMenu = li.querySelector('.context-menu');
+        
+        moreBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            closeAllContextMenus(); // 关闭其他
+            contextMenu.classList.add('show');
+        });
+
+        // 绑定单曲删除事件
+        const deleteBtn = li.querySelector('.delete-option');
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteSong(index);
+        });
+
+        songListEl.appendChild(li);
+    });
+
+    // 恢复批量模式下的UI状态
+    if(isBatchMode) {
+        document.body.classList.add('batch-active');
+        // 重新勾选之前选中的
+        const checkboxes = document.querySelectorAll('.song-checkbox');
+        checkboxes.forEach(box => {
+            const idx = parseInt(box.dataset.index);
+            // 注意：这里简化逻辑，只要索引在Set里就勾选（实际删除后索引会变，稍后处理）
+        });
+    } else {
+        document.body.classList.remove('batch-active');
+    }
 }
 
-if (navigator.share) {
-try {
- await navigator.share({
-    title: song.title,
-    text: `Check out this song: ${song.title} by ${song.artist}`,
-    files: [new File([song.file], `${song.title}.mp3`, { type: song.file.type })]
- });
-} catch (error) {
- console.error('Error sharing:', error);
- alert(`Sharing failed or not supported for files on this browser.\n\nYou can download the song named "${song.title}" from your library.`);
-}
-} else {
-alert("Web Share API is not supported in this browser.");
-}
+// 播放逻辑
+function loadSong(index) {
+    if (index < 0 || index >= songs.length) return;
+    
+    currentSongIndex = index;
+    const song = songs[index];
+    
+    audio.src = song.url;
+    audio.load();
+    
+    // 更新 UI
+    document.getElementById('current-title').innerText = song.title;
+    document.getElementById('current-artist').innerText = song.artist;
+    
+    renderSongList(); // 更新高亮
 }
 
-function closeModal() {
-document.querySelectorAll('.modal, .queue-modal').forEach(m => m.classList.add('hidden'));
+function playSong(index) {
+    loadSong(index);
+    togglePlay();
 }
+
+function togglePlay() {
+    if (songs.length === 0) return;
+    
+    if (audio.paused) {
+        audio.play().then(() => {
+            isPlaying = true;
+            updatePlayButton();
+        }).catch(err => console.error("播放失败:", err));
+    } else {
+        audio.pause();
+        isPlaying = false;
+        updatePlayButton();
+    }
+}
+
+function updatePlayButton() {
+    const icon = playPauseBtn.querySelector('.material-icons');
+    icon.innerText = isPlaying ? 'pause_circle_filled' : 'play_circle_filled';
+}
+
+function playPrev() {
+    let newIndex = currentSongIndex - 1;
+    if (newIndex < 0) newIndex = songs.length - 1;
+    playSong(newIndex);
+}
+
+function playNext() {
+    let newIndex = currentSongIndex + 1;
+    if (newIndex >= songs.length) newIndex = 0;
+    playSong(newIndex);
+}
+
+function closeAllContextMenus() {
+    document.querySelectorAll('.context-menu').forEach(menu => menu.classList.remove('show'));
+}
+
+// --- 删除功能 (单曲) ---
+function deleteSong(index) {
+    if(confirm(`确定要删除 "${songs[index].title}" 吗？`)) {
+        // 如果删除的是当前播放的歌，停止播放
+        if (index === currentSongIndex) {
+            audio.pause();
+            audio.src = "";
+            isPlaying = false;
+            updatePlayButton();
+            document.getElementById('current-title').innerText = "未播放";
+        }
+        
+        songs.splice(index, 1);
+        // 如果删除后的索引变化，需要调整 currentSongIndex
+        if (index < currentSongIndex) {
+            currentSongIndex--;
+        }
+        renderSongList();
+    }
+}
+
+// --- 批量模式逻辑 ---
+
+function toggleBatchMode() {
+    isBatchMode = !isBatchMode;
+    selectedSongIds.clear();
+    updateBatchUI();
+    renderSongList(); // 重新渲染以显示/隐藏复选框
+}
+
+function handleCheckboxChange(index, isChecked) {
+    // 这里我们简单使用 index 作为标识，实际项目中建议使用 song.id
+    if (isChecked) {
+        selectedSongIds.add(index);
+    } else {
+        selectedSongIds.delete(index);
+    }
+    updateBatchUI();
+}
+
+function updateBatchUI() {
+    const count = selectedSongIds.size;
+    selectedCountEl.innerText = count;
+    
+    if (isBatchMode) {
+        batchActionBar.classList.remove('hidden');
+        batchBtn.classList.add('active-state'); // 可选：添加样式表示激活
+        batchBtn.innerHTML = '<span class="material-icons">close</span> 退出批量';
+    } else {
+        batchActionBar.classList.add('hidden');
+        batchBtn.innerHTML = '<span class="material-icons">select_all</span> 批量';
+    }
+}
+
+// 批量删除
+function batchDeleteSongs() {
+    if (selectedSongIds.size === 0) return;
+    
+    if (confirm(`确定要删除选中的 ${selectedSongIds.size} 首歌曲吗？`)) {
+        // 从大到小排序索引，防止删除时索引错位
+        const sortedIndices = Array.from(selectedSongIds).sort((a, b) => b - a);
+        
+        sortedIndices.forEach(index => {
+            if (index === currentSongIndex) {
+                audio.pause();
+                audio.src = "";
+                isPlaying = false;
+                updatePlayButton();
+            }
+            songs.splice(index, 1);
+        });
+        
+        currentSongIndex = -1; // 简单重置
+        toggleBatchMode(); // 退出批量模式
+        renderSongList();
+    }
+}
+
+// 批量导出
+function batchExportSongs() {
+    if (selectedSongIds.size === 0) return;
+    
+    alert("正在准备导出，浏览器可能会询问允许多个文件下载...");
+    
+    selectedSongIds.forEach(index => {
+        const song = songs[index];
+        const a = document.createElement('a');
+        a.href = song.url;
+        a.download = `${song.title}.mp3`; // 尝试恢复文件名
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    });
+    
+    toggleBatchMode();
+}
+
+// 启动应用
+init();
