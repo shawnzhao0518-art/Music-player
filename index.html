@@ -8,13 +8,14 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <link rel="stylesheet" href="style.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
-
 </head>
 <body>
 <div class="app-container">
     <aside class="sidebar">
         <div class="sidebar-header">
-            <img src="logo.png" alt="Logo" class="app-logo">
+            <div class="logo-container">
+                <img src="logo.png" alt="Logo" class="app-logo">
+            </div>
             <span>Music</span>
         </div>
         
@@ -78,9 +79,9 @@
 <div id="full-player-modal" class="full-player-modal hidden">
     <div class="fp-background-blur"></div>
     <div class="fp-header">
-        <div class="capsule-btn" onclick="closeFullScreen()">
+        <button class="fp-close-btn" onclick="closeFullScreen()">
             <i class="fa-solid fa-chevron-down"></i>
-        </div>
+        </button>
     </div>
     
     <div class="fp-content">
@@ -113,11 +114,8 @@
                 <button class="fp-btn-l" id="play-btn-fs" onclick="togglePlay()"><i class="fa-solid fa-play"></i></button>
                 <button class="fp-btn-m" onclick="playNext()"><i class="fa-solid fa-forward-step"></i></button>
             </div>
-            <button class="fp-btn-s" style="visibility: hidden;"><i class="fa-solid fa-volume-high"></i></button>
+            <button class="fp-btn-s" style="opacity: 0; pointer-events: none;"><i class="fa-solid fa-volume-high"></i></button>
         </div>
-        
-        <div class="fp-volume-wrapper hidden"></div>
-        <div class="fp-footer hidden"></div>
     </div>
 </div>
 
@@ -131,7 +129,7 @@
 
 <footer class="player-bar glass" id="mini-player" onclick="openFullScreen(event)">
     <div class="player-info">
-        <div class="cover-art" id="current-cover"><i class="fa-solid fa-music"></i></div>
+        <div class="cover-art" id="current-cover"></div>
         <div class="track-details">
             <div class="track-name" id="current-name">Not Playing</div>
             <div class="track-artist" id="current-artist">--</div>
@@ -158,8 +156,6 @@
     <div class="mini-progress-track" onclick="event.stopPropagation()">
         <input type="range" id="seek-bar" value="0" min="0" step="0.1" oninput="handleSeek(this.value)">
     </div>
-     <span id="current-time" style="display:none;">0:00</span>
-    <span id="total-duration" style="display:none;">0:00</span>
 </footer>
 
 <div id="modal-more-options" class="modal hidden">
