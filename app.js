@@ -221,7 +221,6 @@ const el = document.getElementById('song-list');
 document.getElementById('song-count').innerText = list.length + ' songs';
 el.innerHTML = '';
 
-// Update Header visibility for checkboxes
 const selectHeader = document.getElementById('header-col-select');
 if(state.isSelectionMode) selectHeader.classList.remove('hidden-col');
 else selectHeader.classList.add('hidden-col');
@@ -230,14 +229,12 @@ list.forEach((s, i) => {
 const div = document.createElement('div');
 div.className = 'song-item' + (state.allSongs[state.currentSongIndex]?.id === s.id ? ' active' : '');
 
-// Checkbox Logic
 const isSelected = state.selectedSongs.has(s.id);
 const checkboxHtml = `<div class="col-select ${state.isSelectionMode?'':'hidden-col'}"><input type="checkbox" ${isSelected?'checked':''} onchange="toggleSelectSong('${s.id}')" onclick="event.stopPropagation()"></div>`;
 
 div.innerHTML =  `${checkboxHtml} <div class="col-index">${state.allSongs[state.currentSongIndex]?.id === s.id ? '<i class="fa-solid fa-play"></i>' : i+1}</div> <div class="col-title">${s.title}</div> <div class="col-artist">${s.artist}</div> <div class="col-album">${s.album}</div> <div class="col-time"></div> <div class="col-actions"> <button onclick="openMoreOptionsModal('${s.id}')"><i class="fa-solid fa-ellipsis"></i></button> </div>`;
 div.ondblclick = () => playSongById(s.id);
 
-// Allow row click to toggle checkbox in selection mode
 if(state.isSelectionMode) {
     div.onclick = () => toggleSelectSong(s.id);
     div.style.cursor = "default";
@@ -256,7 +253,6 @@ if(state.isSelectionMode) {
 }
 function switchView(id) {
 state.currentView = id;
-// Exit selection mode when switching views
 if(state.isSelectionMode) toggleSelectionMode();
 document.querySelectorAll('.menu-item').forEach(e => e.classList.remove('active'));
 const menuItem = document.querySelector(`[data-view="${id}"]`);
@@ -334,7 +330,7 @@ if(confirm(`Delete ${state.selectedSongs.size} songs?`)) {
         MusicDB.deleteSong(id);
     });
     state.allSongs = state.allSongs.filter(s => !state.selectedSongs.has(s.id));
-    toggleSelectionMode(); // Exit mode
+    toggleSelectionMode(); 
 }
 }
 
@@ -348,11 +344,11 @@ for(const id of ids) {
         const url = URL.createObjectURL(song.file);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${song.title}.mp3`; // Try to assume mp3 or original extension
+        a.download = `${song.title}.mp3`; 
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        await new Promise(r => setTimeout(r, 500)); // Small delay to prevent browser block
+        await new Promise(r => setTimeout(r, 500)); 
     }
 }
 toggleSelectionMode();
@@ -360,7 +356,6 @@ toggleSelectionMode();
 
 function batchAddToPlaylist() {
 if(!state.selectedSongs.size) return;
-// Reuse the playlist modal but with batch logic
 document.getElementById('modal-add-to-playlist').classList.remove('hidden');
 const ul = document.getElementById('modal-playlist-list'); ul.innerHTML = '';
 state.playlists.forEach(p => {
