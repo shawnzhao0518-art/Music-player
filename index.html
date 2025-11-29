@@ -50,9 +50,7 @@
                 <input type="text" id="search-input" placeholder="Search" oninput="handleSearch(this.value)">
             </div>
             <div class="actions">
-                <button class="btn-primary" id="btn-select-mode" onclick="toggleSelectionMode()">
-                    Select
-                </button>
+                <button class="btn-text-action" id="btn-select-mode" onclick="toggleSelectionMode()">Select</button>
                 <input type="file" id="file-upload" multiple accept=".mp3, .m4a, .wav, .flac, .ogg, audio/*" style="display: none;" onchange="handleFiles(this.files)">
                 <button class="btn-primary" onclick="document.getElementById('file-upload').click()">
                     <i class="fa-solid fa-arrow-up-from-bracket"></i> Import
@@ -83,7 +81,7 @@
 <div id="batch-bar" class="batch-bar hidden">
     <div class="batch-info">
         <span id="selected-count">0 Selected</span>
-        <button class="btn-text" onclick="selectAll()">Select All</button>
+        <button class="btn-text-link" onclick="selectAll()">Select All</button>
     </div>
     <div class="batch-actions">
         <button class="btn-batch" onclick="batchExport()"><i class="fa-solid fa-download"></i> Export</button>
@@ -107,9 +105,13 @@
         </div>
 
         <div class="fp-info">
-            <div class="fp-text">
-                <h2 id="fp-title">Not Playing</h2>
-                <p id="fp-artist">--</p>
+            <div class="fp-text-mask">
+                <div class="fp-text-inner">
+                    <h2 id="fp-title" class="scrolling-text">Not Playing</h2>
+                </div>
+                <div class="fp-text-inner">
+                    <p id="fp-artist" class="scrolling-text">--</p>
+                </div>
             </div>
             <button class="fp-btn-s" onclick="openMoreOptionsModal(state.allSongs[state.currentSongIndex]?.id)">
                 <i class="fa-solid fa-ellipsis"></i>
