@@ -3,114 +3,114 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ShawnMusic Player</title>
+    <title>ShawnMusic</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
 <body>
 
-    <div class="app-container">
-        <aside class="sidebar">
-            <div class="logo-area">
-                <img src="logo.png" alt="ShawnMusic Logo" class="logo">
-                <h2>ShawnMusic</h2>
-            </div>
-            
-            <nav class="nav-links">
-                <a href="#" class="active"><span class="material-icons">home</span> 现在的音乐</a>
-                <a href="#"><span class="material-icons">search</span> 搜索</a>
-                <a href="#"><span class="material-icons">library_music</span> 资料库</a>
-            </nav>
-
-            <div class="playlists">
-                <h3>播放列表</h3>
-                <ul>
-                    <li><span class="material-icons">queue_music</span> 我的最爱</li>
-                    <li><span class="material-icons">queue_music</span> 跑步歌单</li>
-                    <li><span class="material-icons">queue_music</span> 睡眠音乐</li>
-                </ul>
-            </div>
-        </aside>
-
-        <main class="main-content">
-            <header class="top-bar">
-                <div class="search-bar">
-                    <span class="material-icons">search</span>
-                    <input type="text" placeholder="搜索本地歌曲...">
-                </div>
-                <div class="top-actions">
-                    <button id="batch-btn" class="icon-btn-text">
-                        <span class="material-icons">select_all</span> 批量
-                    </button>
-                    <input type="file" id="file-input" accept="audio/*" multiple hidden>
-                    <button id="import-btn" class="primary-btn">
-                        <span class="material-icons">add</span> 导入音乐
-                    </button>
-                    <div class="user-profile">
-                        <span class="material-icons">account_circle</span>
-                    </div>
-                </div>
-            </header>
-
-            <div class="content-scroll">
-                <div class="hero-section">
-                    <h1>本地音乐库</h1>
-                    <p>享受极致的本地播放体验</p>
-                </div>
-
-                <div class="song-list-header">
-                    <span>歌曲</span>
-                    <span>歌手</span>
-                    <span>专辑</span>
-                    <span>时长</span>
-                    <span>操作</span>
-                </div>
-
-                <ul id="song-list" class="song-list">
-                    </ul>
-            </div>
-        </main>
-
-        <footer class="player-bar">
-            <div class="now-playing">
-                <div class="cover-thumb" id="mini-cover"></div>
-                <div class="track-info">
-                    <h4 id="current-title">未播放</h4>
-                    <p id="current-artist">--</p>
-                </div>
-            </div>
-
-            <div class="player-controls">
-                <div class="control-buttons">
-                    <button class="icon-btn" id="prev-btn"><span class="material-icons">skip_previous</span></button>
-                    <button class="play-btn" id="play-pause-btn"><span class="material-icons">play_circle_filled</span></button>
-                    <button class="icon-btn" id="next-btn"><span class="material-icons">skip_next</span></button>
-                </div>
-                <div class="progress-area">
-                    <span id="current-time">0:00</span>
-                    <input type="range" id="progress-bar" value="0" min="0" max="100">
-                    <span id="total-duration">0:00</span>
-                </div>
-            </div>
-
-            <div class="volume-controls">
-                <span class="material-icons">volume_up</span>
-                <input type="range" id="volume-slider" min="0" max="1" step="0.1" value="1">
-            </div>
-        </footer>
-
-        <div id="batch-action-bar" class="batch-action-bar hidden">
-            <div class="batch-info">已选择 <span id="selected-count">0</span> 首歌曲</div>
-            <div class="batch-buttons">
-                <button id="batch-add-playlist"><span class="material-icons">playlist_add</span> 添加到歌单</button>
-                <button id="batch-export"><span class="material-icons">download</span> 导出</button>
-                <button id="batch-delete" class="danger"><span class="material-icons">delete</span> 删除</button>
-                <button id="batch-cancel"><span class="material-icons">close</span> 取消</button>
-            </div>
+<div class="app-container">
+    <aside class="sidebar">
+        <div class="window-controls">
+            <span class="dot red"></span>
+            <span class="dot yellow"></span>
+            <span class="dot green"></span>
+        </div>
+        
+        <div class="nav-group">
+            <div class="nav-title">Apple Music</div>
+            <a href="#" class="nav-item active"><span class="material-icons">home</span> 现在的音乐</a>
+            <a href="#" class="nav-item"><span class="material-icons">grid_view</span> 浏览</a>
+            <a href="#" class="nav-item"><span class="material-icons">sensors</span> 广播</a>
         </div>
 
+        <div class="nav-group">
+            <div class="nav-title">资料库</div>
+            <a href="#" class="nav-item"><span class="material-icons">access_time</span> 最近添加</a>
+            <a href="#" class="nav-item"><span class="material-icons">mic</span> 艺人</a>
+            <a href="#" class="nav-item"><span class="material-icons">album</span> 专辑</a>
+            <a href="#" class="nav-item"><span class="material-icons">music_note</span> 歌曲</a>
+        </div>
+    </aside>
+
+    <main class="main-view">
+        <header class="top-header">
+            <div class="search-box">
+                <span class="material-icons">search</span>
+                <input type="text" placeholder="搜索">
+            </div>
+            
+            <div class="header-actions">
+                <button id="batch-toggle-btn" class="text-btn">批量</button>
+                
+                <input type="file" id="file-input" hidden multiple accept="audio/*">
+                <button id="import-btn" class="icon-btn" title="导入音乐">
+                    <span class="material-icons">add</span>
+                </button>
+                <div class="avatar">S</div>
+            </div>
+        </header>
+
+        <div class="content-scroll-area">
+            <div class="page-title">
+                <h1>歌曲</h1>
+                <span id="song-count-label">0 首歌</span>
+            </div>
+
+            <div class="song-table-header">
+                <div class="col-check"></div> <div class="col-name">名称</div>
+                <div class="col-artist">艺人</div>
+                <div class="col-album">专辑</div>
+                <div class="col-time">时长</div>
+                <div class="col-action"></div>
+            </div>
+
+            <ul id="song-list" class="song-list">
+                </ul>
+        </div>
+    </main>
+</div>
+
+<div class="player-bar">
+    <div class="now-playing">
+        <div class="album-cover" id="album-cover">
+            <span class="material-icons">music_note</span>
+        </div>
+        <div class="track-info">
+            <div class="track-name" id="current-title">未播放</div>
+            <div class="track-artist" id="current-artist">--</div>
+        </div>
     </div>
 
-    <script src="app.js"></script>
+    <div class="player-center">
+        <div class="controls">
+            <button class="control-btn" id="prev-btn"><span class="material-icons">skip_previous</span></button>
+            <button class="control-btn play-btn-large" id="play-pause-btn"><span class="material-icons">play_arrow</span></button>
+            <button class="control-btn" id="next-btn"><span class="material-icons">skip_next</span></button>
+        </div>
+        <div class="progress-container">
+            <span class="time-text" id="current-time">0:00</span>
+            <input type="range" id="progress-bar" value="0" min="0" max="100">
+            <span class="time-text" id="total-duration">0:00</span>
+        </div>
+    </div>
+
+    <div class="volume-section">
+        <span class="material-icons">volume_up</span>
+        <input type="range" id="volume-slider" min="0" max="1" step="0.1" value="1">
+    </div>
+</div>
+
+<div id="batch-bar" class="batch-bar hidden">
+    <div class="selected-info">已选 <span id="selected-count">0</span> 首</div>
+    <div class="batch-btns">
+        <button id="batch-add-btn"><span class="material-icons">playlist_add</span> 添加到...</button>
+        <button id="batch-export-btn"><span class="material-icons">download</span> 导出</button>
+        <button id="batch-delete-btn" class="danger"><span class="material-icons">delete</span> 删除</button>
+        <button id="batch-cancel-btn" class="cancel"><span class="material-icons">close</span></button>
+    </div>
+</div>
+
+<script src="app.js"></script>
 </body>
 </html>
