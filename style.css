@@ -96,6 +96,17 @@ display: flex; align-items: center; width: 260px; gap: 10px; color: var(--text-s
 }
 .search-wrapper:focus-within { background: #fff; box-shadow: 0 0 0 1px var(--accent-color), 0 2px 8px rgba(0,0,0,0.05); color: var(--accent-color); }
 .search-wrapper input { border: none; background: transparent; outline: none; width: 100%; font-family: inherit; font-size: 13px; color: var(--text-primary); }
+
+/* 修复：Top Bar Actions 布局 */
+.actions {
+display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+}
+.btn-text-action {
+background: none; border: none; color: var(--accent-color); font-weight: 600; 
+font-size: 14px; cursor: pointer; padding: 6px 10px; border-radius: 6px;
+transition: background 0.2s;
+}
+.btn-text-action:hover { background: rgba(250, 35, 59, 0.08); }
 .btn-primary {
 background: transparent; color: var(--accent-color); border: none; padding: 6px 16px; cursor: pointer; font-weight: 600; font-size: 13px;
 display: flex; align-items: center; gap: 6px; border-radius: 6px; transition: background 0.2s;
@@ -107,7 +118,6 @@ display: flex; align-items: center; gap: 6px; border-radius: 6px; transition: ba
 .view-header { padding: 24px 32px 10px; display: flex; flex-direction: column; gap: 4px; }
 .view-header h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.5px; }
 #song-count { font-size: 13px; color: var(--text-secondary); font-weight: 500; }
-/* Grid Updated for Selection Column */
 .song-table-header {
 display: grid; grid-template-columns: 30px 40px 4fr 3fr 3fr 60px 50px;
 padding: 10px 32px; border-bottom: 1px solid var(--divider-color);
@@ -134,7 +144,6 @@ padding: 4px; font-size: 14px; opacity: 0; transition: opacity 0.2s;
 }
 .song-item:hover .col-actions button { opacity: 1; }
 .col-actions button:hover { color: var(--accent-color); }
-/* Custom Checkbox */
 .col-select input[type="checkbox"] {
 appearance: none; width: 16px; height: 16px; border: 1px solid #d1d1d6; border-radius: 50%; cursor: pointer; display: grid; place-content: center;
 }
@@ -151,7 +160,7 @@ padding: 0 40px; transform: translateY(0); transition: transform 0.3s;
 }
 .batch-bar.hidden { transform: translateY(100%); }
 .batch-info { display: flex; gap: 20px; align-items: center; font-weight: 600; color: var(--text-primary); }
-.btn-text { background: none; border: none; color: var(--accent-color); font-weight: 500; cursor: pointer; }
+.btn-text-link { background: none; border: none; color: var(--accent-color); font-weight: 500; cursor: pointer; }
 .batch-actions { display: flex; gap: 12px; }
 .btn-batch { padding: 8px 16px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; background: #f2f2f7; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
 .btn-batch:hover { background: #e5e5ea; }
@@ -194,10 +203,38 @@ z-index: 100; border-top: 1px solid rgba(0,0,0,0.05); cursor: pointer; transitio
 .fp-content { width: 100%; max-width: 380px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; padding: 20px 32px 40px; }
 .fp-cover-container { width: 100%; aspect-ratio: 1/1; max-height: 45vh; border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); overflow: hidden; background: #fafafa; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; }
 .fp-cover { width: 100%; height: 100%; background-size: cover; background-position: center; background-color: #f0f0f5; }
-.fp-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-.fp-text h2 { font-size: 22px; font-weight: 700; margin-bottom: 4px; color: var(--text-primary); }
-.fp-text p { font-size: 16px; color: var(--accent-color); font-weight: 500; }
-.fp-btn-s { background: #f2f2f7; border: none; color: var(--text-secondary); width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+/* 修复：全屏播放器信息栏布局，防止按钮被挤压 */
+.fp-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 20px; }
+.fp-text-mask {
+flex: 1; overflow: hidden; display: flex; flex-direction: column; gap: 4px;
+}
+/* 跑马灯效果容器 */
+.fp-text-inner {
+overflow: hidden; white-space: nowrap; mask-image: linear-gradient(to right, transparent, black 2%, black 98%, transparent);
+}
+.scrolling-text {
+display: inline-block; white-space: nowrap;
+animation: scroll-text 15s linear infinite; /* 滚动动画 */
+padding-left: 0;
+}
+/* 仅当文字较长时，animation生效 (实际上CSS无法自动检测，这里统一给一个较慢的移动，或者你可以选择text-overflow: ellipsis) */
+/* 为了最好的效果，我们这里做一个简单的往复滚动或者单向滚动 */
+@keyframes scroll-text {
+0% { transform: translateX(0); }
+20% { transform: translateX(0); } /* 停顿一会 */
+100% { transform: translateX(-100%); }
+}
+
+.fp-text-inner h2 { font-size: 22px; font-weight: 700; color: var(--text-primary); margin: 0; }
+.fp-text-inner p { font-size: 16px; color: var(--accent-color); font-weight: 500; margin: 0; }
+
+.fp-btn-s {
+background: #f2f2f7; border: none; color: var(--text-secondary); width: 32px; height: 32px;
+border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
+flex-shrink: 0; /* 关键修复：禁止缩小 */
+}
+
 .fp-progress-container { width: 100%; margin-bottom: 20px; }
 .fp-times { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-secondary); margin-top: 8px; font-weight: 600; font-family: monospace; }
 .fp-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
@@ -207,7 +244,7 @@ z-index: 100; border-top: 1px solid rgba(0,0,0,0.05); cursor: pointer; transitio
 .fp-btn-l:hover { transform: scale(1.05); background: var(--accent-color); }
 .fp-btn-s.active { color: var(--accent-color); background: rgba(250, 35, 59, 0.1); }
 
-/* === Queue Modal Full Screen === */
+/* Queue & Modals remain same */
 .queue-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; z-index: 300; display: flex; flex-direction: column; transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); transform: translateY(0); }
 .queue-modal.hidden { transform: translateY(100%); }
 .queue-modal-header { padding: 20px 32px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--divider-color); background: #fff; flex-shrink: 0; }
@@ -218,7 +255,6 @@ z-index: 100; border-top: 1px solid rgba(0,0,0,0.05); cursor: pointer; transitio
 .queue-list-item.active .q-title { font-weight: 600; }
 .q-title { font-size: 14px; font-weight: 500; }
 
-/* === Modals === */
 .modal { background: rgba(0,0,0,0.4); backdrop-filter: blur(5px); position: fixed; inset: 0; z-index: 400; display: flex; align-items: flex-end; justify-content: center; opacity: 1; visibility: visible; transition: opacity 0.3s; }
 .modal.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
 .modal-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
